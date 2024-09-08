@@ -1,6 +1,7 @@
 
 # Specify cmake version - make sure we have the needed features
-cmake_minimum_required (VERSION 2.8)
+# cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 3.2)
 
 # Define the project name and language
 set (PROJECT_NAME vorpal)
@@ -12,12 +13,17 @@ set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 set (CMAKE_C_FLAGS_DEBUG "-O0 -g -Wall")
 set (CMAKE_C_FLAGS_RELEASE "-O3 -Wall")
 
+# Find OpenAL package
+find_package(OpenAL REQUIRED)
+
 # Where to look for when using #include <...>
 include_directories (${OPENAL_INCLUDE_DIR})
 include_directories (${CMAKE_SOURCE_DIR}/src)
 include_directories (${CMAKE_BINARY_DIR}/externals/include)
+include_directories(${CMAKE_BINARY_DIR}/src)
 
 link_directories (${CMAKE_BINARY_DIR}/externals/lib)
+
 
 # Define a exporting name
 set (PROJECT_EXPORT "lib${PROJECT_NAME}")

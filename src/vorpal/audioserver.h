@@ -5,8 +5,10 @@
 #include <vorpal/portable.h>
 #include <vorpal/status.h>
 
-#include ODA_OPENAL_DIR(al.h)
-#include ODA_OPENAL_DIR(alc.h)
+/* #include ODA_OPENAL_DIR(al.h)
+#include ODA_OPENAL_DIR(alc.h) */
+#include <AL/al.h>
+#include <AL/alc.h>
 
 #include <chrono>
 #include <cmath>
