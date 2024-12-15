@@ -19,7 +19,7 @@ This allows submodules with "git://" on their URLs to be updated.
 Then, run:
 
 ```bash
-git submodule update --init
+git submodule update --init --recursive
 mkdir build
 cd build
 cmake ..
