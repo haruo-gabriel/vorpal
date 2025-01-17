@@ -24,12 +24,23 @@ include_directories(${CMAKE_BINARY_DIR}/src)
 
 link_directories (${CMAKE_BINARY_DIR}/externals/lib)
 
-
-# Define a exporting name
-set (PROJECT_EXPORT "lib${PROJECT_NAME}")
+set (PROJECT_EXPORT "${PROJECT_NAME}")
 
 add_subdirectory (externals)
 add_subdirectory (src)
+
+# Install Vorpal library
+install(TARGETS ${PROJECT_EXPORT}
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# Install Vorpal headers
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/src/
+    DESTINATION include/vorpal
+    FILES_MATCHING PATTERN "*.h"
+)
 
 # Install ODA Panel patches
 install (FILES
