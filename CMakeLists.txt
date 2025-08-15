@@ -1,7 +1,7 @@
 
 # Specify cmake version - make sure we have the needed features
 # cmake_minimum_required (VERSION 2.8)
-cmake_minimum_required (VERSION 3.2)
+cmake_minimum_required (VERSION 3.5)
 
 # Define the project name and language
 set (PROJECT_NAME vorpal)
@@ -16,6 +16,7 @@ set (CMAKE_C_FLAGS_RELEASE "-O3 -Wall")
 # Find OpenAL package
 find_package(OpenAL REQUIRED)
 
+
 # Where to look for when using #include <...>
 include_directories (${OPENAL_INCLUDE_DIR})
 include_directories (${CMAKE_SOURCE_DIR}/src)
@@ -26,8 +27,8 @@ link_directories (${CMAKE_BINARY_DIR}/externals/lib)
 
 set (PROJECT_EXPORT "${PROJECT_NAME}")
 
-add_subdirectory (externals)
 add_subdirectory (src)
+add_subdirectory (externals)
 
 # Install Vorpal library
 install(TARGETS ${PROJECT_EXPORT}

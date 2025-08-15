@@ -39,11 +39,16 @@ configure_file (
 # Define our build target as a shared lib
 add_library (${PROJECT_NAME} STATIC ${PROJECT_SRC} ${PROJECT_HEADERS})
 
+target_include_directories(vorpal PRIVATE
+  ${CMAKE_BINARY_DIR}/externals/include/libpd
+  ${CMAKE_BINARY_DIR}/externals/include/libpd/util
+)
+
 # Link with OpenAL + libpd
 target_link_libraries (
   ${PROJECT_NAME} PUBLIC
-  ${OPENAL_LIBRARY}
   pdcpp
+  ${OPENAL_LIBRARY}
 )
 
 # Set a few properties:
