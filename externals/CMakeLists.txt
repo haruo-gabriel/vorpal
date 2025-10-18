@@ -194,6 +194,11 @@ target_compile_definitions(pdcpp PUBLIC
   ${ENDIAN_DEF}
 )
 
+if(DEFINED ENABLE_LIBPD_MULTI AND ENABLE_LIBPD_MULTI)
+  message(STATUS "ENABLE_LIBPD_MULTI is ON: adding PDINSTANCE/PDTHREADS to pdcpp target")
+  target_compile_definitions(pdcpp PUBLIC PDINSTANCE=1 PDTHREADS=1)
+endif()
+
 target_compile_options(pdcpp PUBLIC -fPIC)
 
 target_link_options(pdcpp PUBLIC "-Wl,-Bsymbolic")

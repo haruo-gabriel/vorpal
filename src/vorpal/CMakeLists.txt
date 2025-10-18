@@ -51,6 +51,11 @@ target_link_libraries (
   ${OPENAL_LIBRARY}
 )
 
+if(DEFINED ENABLE_LIBPD_MULTI AND ENABLE_LIBPD_MULTI)
+  message(STATUS "ENABLE_LIBPD_MULTI is ON: adding PDINSTANCE/PDTHREADS defs to vorpal target")
+  target_compile_definitions(${PROJECT_NAME} PUBLIC PDINSTANCE=1 PDTHREADS=1)
+endif()
+
 # Set a few properties:
 #  - Use C++11
 #  - Output the lib file to <build directory>/lib
