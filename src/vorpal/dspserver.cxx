@@ -9,6 +9,7 @@
 #include <libpd/PdBase.hpp>
 #include <libpd/PdReceiver.hpp>
 #include <libpd/PdTypes.hpp>
+#include <vorpal/instancemanager.h>
 
 #include <algorithm>
 #include <deque>
@@ -48,10 +49,10 @@ using Command = std::tuple<Patch*, string, vector<Parameter>>;
 const int             TICK_RATIO = 1;
 
 bool                  started = false;
-PdBase                dsp;
 unique_ptr<Receiver>  receiver;
-float                 inbuf[6400], outbuf[6400];
+// keep search_paths locally for patch lookup; PDInstance also stores its own paths
 vector<string>        search_paths;
+InstanceManager       instance_manager;
 
 // Patch management
 deque<Command>        commands__;
@@ -62,11 +63,13 @@ void Receiver::print(const string &message) {
 }
 
 void addNumber(float number) {
-  dsp.addFloat(number);
+  auto inst = instance_manager.defaultInstance();
+  if (inst) inst->pd().addFloat(number);
 }
 
 void addSymbol(const string &symbol) {
-  dsp.addSymbol(symbol);
+  auto inst = instance_manager.defaultInstance();
+  if (inst) inst->pd().addSymbol(symbol);
 }
 
 bool checkPath (const string &path) {
@@ -146,14 +149,15 @@ Patch* DSPServer::UnitImpl::to_be_closed() {
 Status DSPServer::start(const vector<string>& patch_paths) {
   if (started)
     return Status::FAILURE("DSP Server already started");
-  if (dsp.init(1, 1, sample_rate())) {
+  // create a default instance (id 0) to preserve single-instance behavior
+  if (instance_manager.createInstance(0, patch_paths, sample_rate())) {
     started = true;
     search_paths.clear();
     for (const string& path : patch_paths)
       addPath(path);
-    dsp.computeAudio(true);
     receiver.reset(new Receiver);
-    dsp.setReceiver(receiver.get());
+    auto inst = instance_manager.get(0);
+    if (inst) inst->pd().setReceiver(receiver.get());
     return Status::OK("DSP Server started succesfully");
   }
   return Status::FAILURE("DSP Server could not start");
@@ -163,7 +167,10 @@ shared_ptr<DSPUnit> DSPServer::loadUnit(const string &path) {
   string filename = path + ".pd";
   for (string search_path : search_paths) {
     if (checkPath(search_path+"/"+filename)) {
-      Patch check = dsp.openPatch(filename, search_path);
+      // open with the default instance
+      PDInstance* inst = instance_manager.get(0);
+      if (!inst) continue;
+      Patch check = inst->pd().openPatch(filename, search_path);
       if (check.isValid()) {
         Patch *patch = new Patch(check);
         return make_shared<UnitImpl>(patch);
@@ -186,7 +193,8 @@ double DSPServer::time_per_tick() const {
 }
 
 void DSPServer::addPath(const string &path) {
-  dsp.addToSearchPath(path);
+  PDInstance* inst = instance_manager.get(0);
+  if (inst) inst->pd().addToSearchPath(path);
   search_paths.push_back(path);
 }
 
@@ -197,10 +205,12 @@ void DSPServer::handleCommands() {
   vector<Parameter> parameters;
   ParameterSwitch   switcher(&addNumber, &addSymbol);
   while (UnitImpl::popCommand(&patch, &identifier, &parameters)) {
-    dsp.startMessage();
+    PDInstance* inst = instance_manager.get(0);
+    if (!inst) continue;
+    inst->pd().startMessage();
     for (Parameter param : parameters)
       switcher.handle(param);
-    dsp.finishMessage(patch->dollarZeroStr() + "-command", identifier);
+    inst->pd().finishMessage(patch->dollarZeroStr() + "-command", identifier);
   }
 }
 
@@ -210,12 +220,13 @@ void DSPServer::process(int ticks, vector<float> *signal) {
   signal->resize(ticks*tick_size(), 0.0f);
   for (int i = 0; i < ticks; ++i) {
     // Process global signal
-    dsp.processFloat(TICK_RATIO, inbuf, outbuf);
+    PDInstance* inst = instance_manager.get(0);
+    if (inst) inst->processTick(TICK_RATIO);
     // Collect processed audio
     for (UnitImpl *unit : UnitImpl::units__) {
       Patch *patch = unit->patch_;
       const string array_name = "vorpal-bus-"+patch->dollarZeroStr();
-      if (dsp.readArray(array_name, temp, tick_size()))
+      if (inst && inst->readBus(patch->dollarZeroStr(), temp, tick_size()))
         for (int k = 0; k < tick_size(); ++k)
           (*signal)[k + i*tick_size()] += temp[k];
     }
@@ -223,10 +234,11 @@ void DSPServer::process(int ticks, vector<float> *signal) {
 }
 
 void DSPServer::processTick() {
-  dsp.processFloat(TICK_RATIO, inbuf, outbuf);
+  PDInstance* inst = instance_manager.get(0);
+  if (!inst) return;
+  inst->processTick(TICK_RATIO);
   for (UnitImpl *unit : UnitImpl::units__) {
-    const string array_name = "vorpal-bus-"+unit->patch_->dollarZeroStr();
-    if (!dsp.readArray(array_name, unit->buffer_, tick_size()))
+    if (!inst->readBus(unit->patch_->dollarZeroStr(), unit->buffer_, tick_size()))
       ; // FIXME houston...
   }
 }
@@ -235,7 +247,8 @@ void DSPServer::cleanUp() {
   Patch *patch;
   while ((patch = UnitImpl::to_be_closed())) {
     if (patch->isValid()) {
-      dsp.closePatch(*patch);
+      PDInstance* inst = instance_manager.get(0);
+      if (inst) inst->pd().closePatch(*patch);
     }
     delete patch;
   }

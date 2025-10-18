@@ -12,6 +12,7 @@ set (PROJECT_SRC
   parameter.cxx
   soundtrackevent.cxx
   pdinstance.cxx
+  instancemanager.cxx
 )
 
 # Define source code headers
@@ -27,6 +28,7 @@ set (PROJECT_HEADERS
   portable.h
   soundtrackevent.h
   pdinstance.h
+  instancemanager.h
 )
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
