@@ -9,8 +9,10 @@ PDInstance::~PDInstance() { finish(); }
 
 bool PDInstance::start(const std::vector<std::string>& search_paths, int sample_rate, bool queued) {
   search_paths_ = search_paths;
-  // Initialize PdBase: 0 inputs, 2 outputs stereo
-  if (!pd_.init(0, 2, sample_rate, queued)) {
+  // Initialize PdBase: in/out channels: in=0, out=2 by default
+  in_channels_ = 0;
+  out_channels_ = 2;
+  if (!pd_.init(in_channels_, out_channels_, sample_rate, queued)) {
     std::fprintf(stderr, "PDInstance::start() pd.init failed for instance %d\n", id_);
     return false;
   }
@@ -68,7 +70,15 @@ void PDInstance::handleCommands() {
 }
 
 void PDInstance::processTick(int tick_ratio) {
-  pd_.processFloat(tick_ratio, nullptr, nullptr);
+  // libpd expects valid buffers. allocate minimal buffers based on channels.
+  const int ticks = tick_ratio;
+  const int in_size = ticks * pd::PdBase::blockSize() * in_channels_;
+  const int out_size = ticks * pd::PdBase::blockSize() * out_channels_;
+  std::vector<float> inbuf(in_size > 0 ? in_size : 1);
+  std::vector<float> outbuf(out_size > 0 ? out_size : 1);
+  const float* inptr = in_channels_ > 0 ? inbuf.data() : nullptr;
+  float* outptr = outbuf.data();
+  pd_.processFloat(ticks, inptr, outptr);
 }
 
 int PDInstance::readBus(const std::string& dollar_zero, std::vector<float>& out, int tick_size) {

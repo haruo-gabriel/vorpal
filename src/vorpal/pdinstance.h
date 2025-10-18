@@ -46,6 +46,8 @@ public:
 private:
   int id_ = 0;
   pd::PdBase pd_;
+  int in_channels_ = 0;
+  int out_channels_ = 2;
   std::vector<std::string> search_paths_;
   std::unordered_map<std::string, pd::Patch> patches_; // key = $0 string
   std::queue<PdCommand> commands_;
