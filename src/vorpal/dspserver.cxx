@@ -55,7 +55,7 @@ vector<string>        search_paths;
 InstanceManager       instance_manager;
 
 // Patch management
-deque<Command>                        commands__;
+// Per-instance commands handled by PDInstance; remove global fallback queue
 deque<std::pair<PDInstance*, Patch*>> to_be_closed__;
 
 void Receiver::print(const string &message) {
@@ -95,8 +95,7 @@ class DSPServer::UnitImpl final : public DSPUnit {
                    const vector<Parameter> &parameters) override;
  private:
   friend class DSPServer;
-  static bool popCommand(pd::Patch **patch, std::string *identifier,
-                         std::vector<Parameter> *parameters);
+  // No global command queue any more; commands route to UnitImpl::owner_->enqueue
   static std::pair<PDInstance*, pd::Patch*> to_be_closed();
   Patch                           *patch_;
   PDInstance                      *owner_;
@@ -131,21 +130,10 @@ void DSPServer::UnitImpl::pushCommand(const string &identifier,
     owner_->enqueue(cmd);
     return;
   }
-  // Fallback to global queue for backward compatibility
-  commands__.emplace_back(patch_, identifier, parameters);
+  // If no owner (shouldn't happen), silently ignore the command
 }
 
-bool DSPServer::UnitImpl::popCommand(pd::Patch **patch, string *identifier,
-                                     vector<Parameter> *parameters) {
-  if (commands__.empty())
-    return false;
-  Command command = commands__.front();
-  *patch = std::get<0>(command);
-  *identifier = std::get<1>(command);
-  *parameters = std::get<2>(command);
-  commands__.pop_front();
-  return true;
-}
+// popCommand removed: per-instance enqueue/handleCommands used instead
 
 std::pair<PDInstance*, pd::Patch*> DSPServer::UnitImpl::to_be_closed() {
   if (to_be_closed__.empty())
@@ -211,17 +199,10 @@ void DSPServer::addPath(const string &path) {
 
 void DSPServer::handleCommands() {
   using namespace std::placeholders;
-  Patch             *patch;
-  string            identifier;
-  vector<Parameter> parameters;
-  ParameterSwitch   switcher(&addNumber, &addSymbol);
-  while (UnitImpl::popCommand(&patch, &identifier, &parameters)) {
-    PDInstance* inst = instance_manager.get(0);
-    if (!inst) continue;
-    inst->pd().startMessage();
-    for (Parameter param : parameters)
-      switcher.handle(param);
-    inst->pd().finishMessage(patch->dollarZeroStr() + "-command", identifier);
+  // Ask each instance to handle its queued commands
+  for (int id : instance_manager.ids()) {
+    PDInstance* inst = instance_manager.get(id);
+    if (inst) inst->handleCommands();
   }
 }
 
