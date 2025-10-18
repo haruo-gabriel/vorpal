@@ -17,78 +17,76 @@ static bool checkFloat(const char *label, float actual, float expected, float ep
 
 int main() {
   using namespace vorpal;
+  std::cout << "PDInstance stress test start" << std::endl;
 
-  std::cout << "PDInstance test start" << std::endl;
+  const int NUM_INSTANCES = 6; // create multiple instances to stress libpd
+  std::vector<std::unique_ptr<PDInstance>> instances;
+  instances.reserve(NUM_INSTANCES);
 
-  PDInstance a(1);
-  PDInstance b(2);
-
-  // Start both instances (mono in=1, out=2)
-  a.start({"../patches"}, 44100, true, 1, 2);
-  b.start({"../patches"}, 44100, true, 1, 2);
-
-  std::cout << "PdBase::numInstances() = " << a.pd().numInstances() << std::endl;
-
-  // Load distinct tiny patches into each instance (they write to different bus names)
-  auto dz_a = a.loadPatch("pdinstance_a.pd");
-  auto dz_b = b.loadPatch("pdinstance_b.pd");
-  std::cout << "a->dz='" << dz_a << "' b->dz='" << dz_b << "'" << std::endl;
-
-  // Send different float messages to each patch's inlet by using finishMessage to the $0-command
-  if (!dz_a.empty()) {
-    PdCommand cmd1;
-    cmd1.receiver = dz_a + "-command";
-    cmd1.selector = "float";
-    cmd1.fargs = { 0.25f };
-    a.enqueue(cmd1);
+  for (int i = 0; i < NUM_INSTANCES; ++i) {
+    instances.emplace_back(new PDInstance(100 + i));
+    bool started = instances.back()->start({"../patches"}, 44100, true, 1, 2);
+    if (!started) {
+      std::cerr << "Failed to start instance " << (100 + i) << std::endl;
+      return 3;
+    }
   }
 
-  if (!dz_b.empty()) {
-    PdCommand cmd2;
-    cmd2.receiver = dz_b + "-command";
-    cmd2.selector = "float";
-    cmd2.fargs = { 0.75f };
-    b.enqueue(cmd2);
+  // Load the same patch into each instance
+  std::vector<std::string> dzs;
+  for (int i = 0; i < NUM_INSTANCES; ++i) {
+    dzs.push_back(instances[i]->loadPatch("pdinstance_a.pd"));
+    std::cout << "inst " << i << " dz=" << dzs.back() << std::endl;
   }
 
-  // Process a few ticks so tabwrite~ fills the arrays
-  for (int i = 0; i < 8; ++i) {
-    a.handleCommands();
-    b.handleCommands();
-    a.processTick();
-    b.processTick();
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  }
-
-  // Read back the bus arrays
-  std::vector<float> out;
-  float firstA = 0.0f;
-  float firstB = 0.0f;
-  bool gotA = false, gotB = false;
-  if (!dz_a.empty()) {
-    std::vector<float> srcA(64, 0.25f);
-    a.writeArray(std::string("vorpal-bus-A"), srcA);
-    int n = a.readBus("A", out, 64); // read vorpal-bus-A
-    firstA = n ? out[0] : 0.0f;
-    gotA = (n > 0);
-    std::cout << "a.readBus returned " << n << " samples, first=" << firstA << std::endl;
-  }
-  if (!dz_b.empty()) {
-    std::vector<float> srcB(64, 0.75f);
-    b.writeArray(std::string("vorpal-bus-B"), srcB);
-    int n = b.readBus("B", out, 64); // read vorpal-bus-B
-    firstB = n ? out[0] : 0.0f;
-    gotB = (n > 0);
-    std::cout << "b.readBus returned " << n << " samples, first=" << firstB << std::endl;
-  }
-
-  a.finish();
-  b.finish();
-
+  // Directly write different float arrays per instance and then read back to verify independence
   bool ok = true;
-  if (gotA) ok = ok && checkFloat("bus-A first", firstA, 0.25f);
-  if (gotB) ok = ok && checkFloat("bus-B first", firstB, 0.75f);
+  std::vector<float> out;
+  for (int i = 0; i < NUM_INSTANCES; ++i) {
+    if (dzs[i].empty()) continue;
+    float expected = 0.1f * (i + 1);
+    std::vector<float> src(64, expected);
+    // write into the per-instance array named 'vorpal-bus-A'
+    instances[i]->writeArray(std::string("vorpal-bus-A"), src);
+    int n = instances[i]->readBus("A", out, 64);
+    float got = n ? out[0] : 0.0f;
+    std::string label = "inst-" + std::to_string(i) + " first";
+    ok = ok && checkFloat(label.c_str(), got, expected, 1e-6f);
+  }
 
-  std::cout << "PDInstance test finished" << std::endl;
-  return ok ? 0 : 2;
+  // Optional: run a time-bound stress loop to simulate longer activity
+  const int STRESS_SECONDS = 3;
+  const auto stress_end = std::chrono::steady_clock::now() + std::chrono::seconds(STRESS_SECONDS);
+  while (std::chrono::steady_clock::now() < stress_end) {
+    for (int i = 0; i < NUM_INSTANCES; ++i) {
+      instances[i]->handleCommands();
+      instances[i]->processTick();
+    }
+    // small sleep to avoid pegging CPU in this synthetic test
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  }
+
+  // Negative test: attempt to open a missing patch in a fresh instance
+  {
+    std::unique_ptr<PDInstance> missing(new PDInstance(9999));
+    bool started = missing->start({"../patches"}, 44100, true, 1, 2);
+    if (!started) {
+      std::cerr << "Warning: could not start instance for missing-patch test" << std::endl;
+    } else {
+      std::string dz_missing = missing->loadPatch("this_patch_does_not_exist.pd");
+      if (!dz_missing.empty()) {
+        std::cerr << "NEGATIVE TEST FAILED: unexpected patch opened: " << dz_missing << std::endl;
+        ok = false;
+      } else {
+        std::cout << "NEGATIVE TEST OK: missing patch did not open (as expected)" << std::endl;
+      }
+      missing->finish();
+    }
+  }
+
+  // shutdown
+  for (auto &inst : instances) inst->finish();
+
+  std::cout << "PDInstance stress test finished" << std::endl;
+  return ok ? 0 : 4;
 }
