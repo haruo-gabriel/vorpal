@@ -48,15 +48,8 @@ class Receiver : public PdReceiver {
 
 const int             TICK_RATIO = 1;
 
-bool                  started = false;
-unique_ptr<Receiver>  receiver;
-// keep search_paths locally for patch lookup; PDInstance also stores its own paths
-vector<string>        search_paths;
-InstanceManager       instance_manager;
-
-// Patch management
-// Per-instance commands handled by PDInstance; remove global fallback queue
-deque<std::pair<PDInstance*, Patch*>> to_be_closed__;
+// Previously file-scope globals moved into DSPServer static members.
+// to_be_closed__ is maintained as a static DSPServer member (defined below).
 
 void Receiver::print(const string &message) {
   std::printf("%s\n", message.c_str());
@@ -74,6 +67,13 @@ bool checkPath (const string &path) {
 }
 
 } // unnamed namespace
+
+// Define DSPServer static members (moved here from file-scope globals)
+bool vorpal::DSPServer::started = false;
+std::unique_ptr<pd::PdReceiver> vorpal::DSPServer::receiver = nullptr;
+std::vector<std::string> vorpal::DSPServer::search_paths;
+vorpal::InstanceManager vorpal::DSPServer::instance_manager;
+std::deque<std::pair<vorpal::PDInstance*, pd::Patch*>> vorpal::DSPServer::to_be_closed__;
 
 // nested class DSPServer::UnitImpl
 
