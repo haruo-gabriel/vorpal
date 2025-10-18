@@ -42,6 +42,14 @@ public:
     return nullptr;
   }
 
+  // Return a list of active instance ids
+  std::vector<int> ids() const {
+    std::vector<int> out;
+    out.reserve(instances_.size());
+    for (auto &kv : instances_) out.push_back(kv.first);
+    return out;
+  }
+
 private:
   std::map<int, std::unique_ptr<PDInstance>> instances_;
 };

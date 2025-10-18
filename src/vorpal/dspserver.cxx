@@ -55,8 +55,8 @@ vector<string>        search_paths;
 InstanceManager       instance_manager;
 
 // Patch management
-deque<Command>        commands__;
-deque<Patch*>         to_be_closed__;
+deque<Command>                        commands__;
+deque<std::pair<PDInstance*, Patch*>> to_be_closed__;
 
 void Receiver::print(const string &message) {
   std::printf("%s\n", message.c_str());
@@ -87,7 +87,7 @@ bool checkPath (const string &path) {
 
 class DSPServer::UnitImpl final : public DSPUnit {
  public:
-  UnitImpl(Patch *patch);
+  UnitImpl(Patch *patch, PDInstance* owner);
   ~UnitImpl();
   Status status() const override { return Status::OK("Valid dsp unit"); }
   void transferSignal(shared_ptr<AudioUnit> audio_unit) override;
@@ -97,21 +97,22 @@ class DSPServer::UnitImpl final : public DSPUnit {
   friend class DSPServer;
   static bool popCommand(pd::Patch **patch, std::string *identifier,
                          std::vector<Parameter> *parameters);
-  static pd::Patch* to_be_closed();
+  static std::pair<PDInstance*, pd::Patch*> to_be_closed();
   Patch                           *patch_;
+  PDInstance                      *owner_;
   vector<float>                   buffer_;
   static unordered_set<UnitImpl*> units__;
 };
 
 unordered_set<DSPServer::UnitImpl*> DSPServer::UnitImpl::units__;
 
-DSPServer::UnitImpl::UnitImpl(Patch *patch)
-  : patch_(patch), buffer_(Engine::TICK_BUFFER_SIZE, 0.0f) {
+DSPServer::UnitImpl::UnitImpl(Patch *patch, PDInstance* owner)
+  : patch_(patch), owner_(owner), buffer_(Engine::TICK_BUFFER_SIZE, 0.0f) {
   units__.insert(this);
 }
 
 DSPServer::UnitImpl::~UnitImpl() {
-  to_be_closed__.push_back(patch_);
+  to_be_closed__.emplace_back(owner_, patch_);
   units__.erase(this);
 }
 
@@ -121,14 +122,13 @@ void DSPServer::UnitImpl::transferSignal(shared_ptr<AudioUnit> audio_unit) {
 
 void DSPServer::UnitImpl::pushCommand(const string &identifier,
                                        const vector<Parameter> &parameters) {
-  // Try to find the PDInstance that owns this patch by dollar-zero and route the command there
-  PDInstance* owner = instance_manager.findInstanceByPatchDollar(patch_->dollarZeroStr());
-  if (owner) {
+  // If this UnitImpl has an owning instance, route the command there.
+  if (owner_) {
     PdCommand cmd;
     cmd.receiver = patch_->dollarZeroStr() + std::string("-command");
     cmd.selector = identifier;
     cmd.params = parameters;
-    owner->enqueue(cmd);
+    owner_->enqueue(cmd);
     return;
   }
   // Fallback to global queue for backward compatibility
@@ -147,12 +147,12 @@ bool DSPServer::UnitImpl::popCommand(pd::Patch **patch, string *identifier,
   return true;
 }
 
-Patch* DSPServer::UnitImpl::to_be_closed() {
+std::pair<PDInstance*, pd::Patch*> DSPServer::UnitImpl::to_be_closed() {
   if (to_be_closed__.empty())
-    return nullptr;
-  Patch *patch = to_be_closed__.front();
+    return {nullptr, nullptr};
+  auto pr = to_be_closed__.front();
   to_be_closed__.pop_front();
-  return patch;
+  return pr;
 }
 
 // Enclosing class DSPServer
@@ -184,7 +184,7 @@ shared_ptr<DSPUnit> DSPServer::loadUnit(const string &path) {
       Patch check = inst->pd().openPatch(filename, search_path);
       if (check.isValid()) {
         Patch *patch = new Patch(check);
-        return make_shared<UnitImpl>(patch);
+          return make_shared<UnitImpl>(patch, inst);
       }
     }
   }
@@ -233,11 +233,11 @@ void DSPServer::process(int ticks, vector<float> *signal) {
     // Process global signal
     PDInstance* inst = instance_manager.get(0);
     if (inst) inst->processTick(TICK_RATIO);
-    // Collect processed audio
+    // Collect processed audio per-unit using its owning instance
     for (UnitImpl *unit : UnitImpl::units__) {
       Patch *patch = unit->patch_;
-      const string array_name = "vorpal-bus-"+patch->dollarZeroStr();
-      if (inst && inst->readBus(patch->dollarZeroStr(), temp, tick_size()))
+      PDInstance* owner = unit->owner_ ? unit->owner_ : inst;
+      if (owner && owner->readBus(patch->dollarZeroStr(), temp, tick_size()))
         for (int k = 0; k < tick_size(); ++k)
           (*signal)[k + i*tick_size()] += temp[k];
     }
@@ -249,18 +249,19 @@ void DSPServer::processTick() {
   if (!inst) return;
   inst->processTick(TICK_RATIO);
   for (UnitImpl *unit : UnitImpl::units__) {
-    if (!inst->readBus(unit->patch_->dollarZeroStr(), unit->buffer_, tick_size()))
+    PDInstance* owner = unit->owner_ ? unit->owner_ : inst;
+    if (!owner->readBus(unit->patch_->dollarZeroStr(), unit->buffer_, tick_size()))
       ; // FIXME houston...
   }
 }
 
 void DSPServer::cleanUp() {
-  Patch *patch;
-  while ((patch = UnitImpl::to_be_closed())) {
+  while (true) {
+    auto pr = UnitImpl::to_be_closed();
+    if (pr.second == nullptr) break;
+    PDInstance* owner = pr.first;
+    Patch *patch = pr.second;
     if (patch->isValid()) {
-      // Find which instance owns this patch and close it there
-      std::string dz = patch->dollarZeroStr();
-      PDInstance* owner = instance_manager.findInstanceByPatchDollar(dz);
       if (owner) owner->pd().closePatch(*patch);
     }
     delete patch;
