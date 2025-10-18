@@ -23,7 +23,9 @@ public:
   // Start the instance; sample_rate defaults to 44100.
   bool start(const std::vector<std::string>& search_paths = {},
              int sample_rate = 44100,
-             bool queued = true);
+             bool queued = true,
+             int in_channels = 0,
+             int out_channels = 2);
   void finish();
 
   // Patch management
@@ -39,6 +41,9 @@ public:
 
   // Read bus array for a patch (vorpal-bus-<dollar_zero>)
   int readBus(const std::string& dollar_zero, std::vector<float>& out, int tick_size);
+
+  // Convenience: write to a pd array
+  bool writeArray(const std::string& arrayName, const std::vector<float>& source, int writeLen = -1, int offset = 0);
 
   int id() const { return id_; }
   pd::PdBase& pd() { return pd_; }

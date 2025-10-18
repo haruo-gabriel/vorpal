@@ -7,11 +7,12 @@ PDInstance::PDInstance(int id) : id_(id) {}
 
 PDInstance::~PDInstance() { finish(); }
 
-bool PDInstance::start(const std::vector<std::string>& search_paths, int sample_rate, bool queued) {
+bool PDInstance::start(const std::vector<std::string>& search_paths, int sample_rate, bool queued,
+                       int in_channels, int out_channels) {
   search_paths_ = search_paths;
-  // Initialize PdBase: in/out channels: in=0, out=2 by default
-  in_channels_ = 0;
-  out_channels_ = 2;
+  // Initialize PdBase: set channels from caller
+  in_channels_ = in_channels;
+  out_channels_ = out_channels;
   if (!pd_.init(in_channels_, out_channels_, sample_rate, queued)) {
     std::fprintf(stderr, "PDInstance::start() pd.init failed for instance %d\n", id_);
     return false;
@@ -86,6 +87,12 @@ int PDInstance::readBus(const std::string& dollar_zero, std::vector<float>& out,
   const auto bus = std::string("vorpal-bus-") + dollar_zero;
   if (!pd_.readArray(bus, out, tick_size)) return 0;
   return tick_size;
+}
+
+bool PDInstance::writeArray(const std::string& arrayName, const std::vector<float>& source, int writeLen, int offset) {
+  // delegate to PdBase::writeArray
+  std::vector<float> src = source; // PdBase API expects non-const vector
+  return pd_.writeArray(arrayName, src, writeLen, offset);
 }
 
 } // namespace vorpal
