@@ -121,6 +121,17 @@ void DSPServer::UnitImpl::transferSignal(shared_ptr<AudioUnit> audio_unit) {
 
 void DSPServer::UnitImpl::pushCommand(const string &identifier,
                                        const vector<Parameter> &parameters) {
+  // Try to find the PDInstance that owns this patch by dollar-zero and route the command there
+  PDInstance* owner = instance_manager.findInstanceByPatchDollar(patch_->dollarZeroStr());
+  if (owner) {
+    PdCommand cmd;
+    cmd.receiver = patch_->dollarZeroStr() + std::string("-command");
+    cmd.selector = identifier;
+    cmd.params = parameters;
+    owner->enqueue(cmd);
+    return;
+  }
+  // Fallback to global queue for backward compatibility
   commands__.emplace_back(patch_, identifier, parameters);
 }
 
@@ -247,8 +258,10 @@ void DSPServer::cleanUp() {
   Patch *patch;
   while ((patch = UnitImpl::to_be_closed())) {
     if (patch->isValid()) {
-      PDInstance* inst = instance_manager.get(0);
-      if (inst) inst->pd().closePatch(*patch);
+      // Find which instance owns this patch and close it there
+      std::string dz = patch->dollarZeroStr();
+      PDInstance* owner = instance_manager.findInstanceByPatchDollar(dz);
+      if (owner) owner->pd().closePatch(*patch);
     }
     delete patch;
   }

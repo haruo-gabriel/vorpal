@@ -1,6 +1,7 @@
 #pragma once
 
 #include <libpd/PdBase.hpp>
+#include "parameter.h"
 #include <memory>
 #include <queue>
 #include <string>
@@ -12,7 +13,8 @@ namespace vorpal {
 struct PdCommand {
   std::string receiver; // e.g., "$0-command"
   std::string selector; // e.g., "start" / custom symbol
-  std::vector<float> fargs; // numeric args only for MVP
+  // Allow mixed parameters (numbers or symbols) to support messages
+  std::vector<Parameter> params; 
 };
 
 class PDInstance {
@@ -47,6 +49,9 @@ public:
 
   int id() const { return id_; }
   pd::PdBase& pd() { return pd_; }
+
+  // Check whether a loaded patch with given dollarZero exists
+  bool hasPatch(const std::string &dollar) const;
 
 private:
   int id_ = 0;

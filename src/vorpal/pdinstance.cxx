@@ -1,4 +1,5 @@
 #include "pdinstance.h"
+#include "parameter.h"
 #include <cstdio>
 
 namespace vorpal {
@@ -64,8 +65,19 @@ void PDInstance::handleCommands() {
   while (!commands_.empty()) {
     const auto cmd = commands_.front();
     commands_.pop();
+  // Use ParameterSwitch to handle numbers and symbols.
+  // Note: the handlers capture `this` (a raw pointer). These lambdas are invoked
+  // synchronously inside `handleCommands()` while the PDInstance is alive, so
+  // capturing `this` is safe here. Do NOT store these lambdas for later use or
+  // call them after the PDInstance may have been destroyed; that would be UB.
     pd_.startMessage();
-    for (float f : cmd.fargs) pd_.addFloat(f);
+    ParameterSwitch sw(
+      // number handler
+      [this](float v) { this->pd().addFloat(v); },
+      // symbol handler
+      [this](const std::string &s) { this->pd().addSymbol(s); }
+    );
+    for (const auto &p : cmd.params) sw.handle(p);
     pd_.finishMessage(cmd.receiver, cmd.selector);
   }
 }
@@ -93,6 +105,10 @@ bool PDInstance::writeArray(const std::string& arrayName, const std::vector<floa
   // delegate to PdBase::writeArray
   std::vector<float> src = source; // PdBase API expects non-const vector
   return pd_.writeArray(arrayName, src, writeLen, offset);
+}
+
+bool PDInstance::hasPatch(const std::string &dollar) const {
+  return patches_.find(dollar) != patches_.end();
 }
 
 } // namespace vorpal

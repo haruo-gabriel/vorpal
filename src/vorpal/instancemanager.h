@@ -29,6 +29,19 @@ public:
 
   PDInstance* defaultInstance() const { return get(0); }
 
+  // Find the instance that has a patch with the given dollarZero (returns nullptr if not found)
+  PDInstance* findInstanceByPatchDollar(const std::string &dollar) const {
+    for (auto &kv : instances_) {
+      PDInstance* inst = kv.second.get();
+      if (!inst) continue;
+      // PDInstance stores patches_ keyed by dollarZero; we'll rely on pdinstance.h exposing an API for this
+      // If PDInstance had a public method hasPatch(dollar), call it. Otherwise fallback: attempt to find via try/catch
+      // We add a small public hasPatch method to PDInstance to support this lookup.
+      if (inst->hasPatch(dollar)) return inst;
+    }
+    return nullptr;
+  }
+
 private:
   std::map<int, std::unique_ptr<PDInstance>> instances_;
 };
