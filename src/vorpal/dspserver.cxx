@@ -44,7 +44,7 @@ class Receiver : public PdReceiver {
   void print(const string &message) override;
 };
 
-using Command = std::tuple<Patch*, string, vector<Parameter>>;
+// Command typedef removed: per-instance command queues are used instead
 
 const int             TICK_RATIO = 1;
 
@@ -62,15 +62,7 @@ void Receiver::print(const string &message) {
   std::printf("%s\n", message.c_str());
 }
 
-void addNumber(float number) {
-  auto inst = instance_manager.defaultInstance();
-  if (inst) inst->pd().addFloat(number);
-}
-
-void addSymbol(const string &symbol) {
-  auto inst = instance_manager.defaultInstance();
-  if (inst) inst->pd().addSymbol(symbol);
-}
+// addNumber/addSymbol removed: PDInstance::handleCommands handles parameters directly
 
 bool checkPath (const string &path) {
   fstream check;
