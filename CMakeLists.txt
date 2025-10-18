@@ -7,6 +7,9 @@ cmake_minimum_required (VERSION 3.5)
 set (PROJECT_NAME vorpal)
 project (${PROJECT_NAME} C CXX)
 
+# Option to enable building libpd with multi-instance support (PDINSTANCE/PDTHREADS)
+option(ENABLE_LIBPD_MULTI "Build libpd with multi-instance support (defines PDINSTANCE and PDTHREADS)" OFF)
+
 # Add a CMake module path for custom modules
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
