@@ -208,32 +208,46 @@ void DSPServer::handleCommands() {
 }
 
 void DSPServer::process(int ticks, vector<float> *signal) {
-  // Process signal
+  // Process signal - iterate over all instances and their units
   vector<float> temp;
   signal->resize(ticks*tick_size(), 0.0f);
+  
   for (int i = 0; i < ticks; ++i) {
-    // Process global signal
-    PDInstance* inst = instance_manager.get(0);
-    if (inst) inst->processTick(TICK_RATIO);
-    // Collect processed audio per-unit using its owning instance
-    for (dsp_detail::UnitImpl *unit : dsp_detail::UnitImpl::units__) {
-      Patch *patch = unit->patch_;
-      PDInstance* owner = unit->owner_ ? unit->owner_ : inst;
-      if (owner && owner->readBus(patch->dollarZeroStr(), temp, tick_size()))
-        for (int k = 0; k < tick_size(); ++k)
-          (*signal)[k + i*tick_size()] += temp[k];
+    // Process each instance
+    for (int instance_id : instance_manager.ids()) {
+      PDInstance* inst = instance_manager.get(instance_id);
+      if (!inst) continue;
+      
+      // Process this instance's tick
+      inst->processTick(TICK_RATIO);
+      
+      // Collect audio from all units belonging to this instance
+      for (dsp_detail::UnitImpl *unit : inst->units()) {
+        Patch *patch = unit->patch_;
+        if (inst->readBus(patch->dollarZeroStr(), temp, tick_size())) {
+          for (int k = 0; k < tick_size(); ++k)
+            (*signal)[k + i*tick_size()] += temp[k];
+        }
+      }
     }
   }
 }
 
 void DSPServer::processTick() {
-  PDInstance* inst = instance_manager.get(0);
-  if (!inst) return;
-  inst->processTick(TICK_RATIO);
-  for (dsp_detail::UnitImpl *unit : dsp_detail::UnitImpl::units__) {
-    PDInstance* owner = unit->owner_ ? unit->owner_ : inst;
-    if (!owner->readBus(unit->patch_->dollarZeroStr(), unit->buffer_, tick_size()))
-      ; // FIXME houston...
+  // Process each instance and its units
+  for (int instance_id : instance_manager.ids()) {
+    PDInstance* inst = instance_manager.get(instance_id);
+    if (!inst) continue;
+    
+    // Process this instance's tick
+    inst->processTick(TICK_RATIO);
+    
+    // Read audio from all units belonging to this instance
+    for (dsp_detail::UnitImpl *unit : inst->units()) {
+      if (!inst->readBus(unit->patch_->dollarZeroStr(), unit->buffer_, tick_size())) {
+        ; // FIXME houston...
+      }
+    }
   }
 }
 
