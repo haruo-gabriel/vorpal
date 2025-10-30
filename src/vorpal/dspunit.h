@@ -12,6 +12,11 @@ namespace vorpal {
 
 class AudioUnit;
 
+// Forward declaration for friend access
+namespace dsp_detail {
+  class UnitImpl;
+}
+
 class DSPUnit {
  public:
   virtual Status status() const = 0;
@@ -20,6 +25,7 @@ class DSPUnit {
                            const std::vector<Parameter> &parameters) = 0;
  private:
   friend class DSPServer;
+  friend class dsp_detail::UnitImpl;
   class Null;
   DSPUnit() {}
 };

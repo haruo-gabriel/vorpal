@@ -69,15 +69,18 @@ bool checkPath (const string &path) {
 } // unnamed namespace
 
 // Define DSPServer static members (moved here from file-scope globals)
-bool vorpal::DSPServer::started = false;
-std::unique_ptr<pd::PdReceiver> vorpal::DSPServer::receiver = nullptr;
-std::vector<std::string> vorpal::DSPServer::search_paths;
-vorpal::InstanceManager vorpal::DSPServer::instance_manager;
-std::deque<std::pair<vorpal::PDInstance*, pd::Patch*>> vorpal::DSPServer::to_be_closed__;
+// Note: we're already inside namespace vorpal, so no vorpal:: prefix needed
+bool DSPServer::started = false;
+std::unique_ptr<pd::PdReceiver> DSPServer::receiver = nullptr;
+std::vector<std::string> DSPServer::search_paths;
+InstanceManager DSPServer::instance_manager;
+std::deque<std::pair<PDInstance*, pd::Patch*>> DSPServer::to_be_closed__;
 
-// nested class DSPServer::UnitImpl
+// UnitImpl implementation in dsp_detail namespace
 
-class DSPServer::UnitImpl final : public DSPUnit {
+namespace dsp_detail {
+
+class UnitImpl final : public DSPUnit {
  public:
   UnitImpl(Patch *patch, PDInstance* owner);
   ~UnitImpl();
@@ -86,7 +89,7 @@ class DSPServer::UnitImpl final : public DSPUnit {
   void pushCommand(const string &identifier,
                    const vector<Parameter> &parameters) override;
  private:
-  friend class DSPServer;
+  friend class vorpal::DSPServer;
   // No global command queue any more; commands route to UnitImpl::owner_->enqueue
   static std::pair<PDInstance*, pd::Patch*> to_be_closed();
   Patch                           *patch_;
@@ -95,23 +98,27 @@ class DSPServer::UnitImpl final : public DSPUnit {
   static unordered_set<UnitImpl*> units__;
 };
 
-unordered_set<DSPServer::UnitImpl*> DSPServer::UnitImpl::units__;
+unordered_set<UnitImpl*> UnitImpl::units__;
 
-DSPServer::UnitImpl::UnitImpl(Patch *patch, PDInstance* owner)
+UnitImpl::UnitImpl(Patch *patch, PDInstance* owner)
   : patch_(patch), owner_(owner), buffer_(Engine::TICK_BUFFER_SIZE, 0.0f) {
   units__.insert(this);
+  // Register with the owning instance's per-instance registry
+  if (owner_) owner_->registerUnit(this);
 }
 
-DSPServer::UnitImpl::~UnitImpl() {
-  to_be_closed__.emplace_back(owner_, patch_);
+UnitImpl::~UnitImpl() {
+  // Unregister from the owning instance's per-instance registry
+  if (owner_) owner_->unregisterUnit(this);
+  ::vorpal::DSPServer::to_be_closed__.emplace_back(owner_, patch_);
   units__.erase(this);
 }
 
-void DSPServer::UnitImpl::transferSignal(shared_ptr<AudioUnit> audio_unit) {
+void UnitImpl::transferSignal(shared_ptr<AudioUnit> audio_unit) {
   audio_unit->stream(buffer_);
 }
 
-void DSPServer::UnitImpl::pushCommand(const string &identifier,
+void UnitImpl::pushCommand(const string &identifier,
                                        const vector<Parameter> &parameters) {
   // If this UnitImpl has an owning instance, route the command there.
   if (owner_) {
@@ -127,15 +134,17 @@ void DSPServer::UnitImpl::pushCommand(const string &identifier,
 
 // popCommand removed: per-instance enqueue/handleCommands used instead
 
-std::pair<PDInstance*, pd::Patch*> DSPServer::UnitImpl::to_be_closed() {
-  if (to_be_closed__.empty())
+std::pair<PDInstance*, pd::Patch*> UnitImpl::to_be_closed() {
+  if (DSPServer::to_be_closed__.empty())
     return {nullptr, nullptr};
-  auto pr = to_be_closed__.front();
-  to_be_closed__.pop_front();
+  auto pr = DSPServer::to_be_closed__.front();
+  DSPServer::to_be_closed__.pop_front();
   return pr;
 }
 
-// Enclosing class DSPServer
+} // namespace dsp_detail
+
+// DSPServer methods (still inside namespace vorpal)
 
 Status DSPServer::start(const vector<string>& patch_paths) {
   if (started)
@@ -164,7 +173,7 @@ shared_ptr<DSPUnit> DSPServer::loadUnit(const string &path) {
       Patch check = inst->pd().openPatch(filename, search_path);
       if (check.isValid()) {
         Patch *patch = new Patch(check);
-          return make_shared<UnitImpl>(patch, inst);
+          return make_shared<dsp_detail::UnitImpl>(patch, inst);
       }
     }
   }
@@ -207,7 +216,7 @@ void DSPServer::process(int ticks, vector<float> *signal) {
     PDInstance* inst = instance_manager.get(0);
     if (inst) inst->processTick(TICK_RATIO);
     // Collect processed audio per-unit using its owning instance
-    for (UnitImpl *unit : UnitImpl::units__) {
+    for (dsp_detail::UnitImpl *unit : dsp_detail::UnitImpl::units__) {
       Patch *patch = unit->patch_;
       PDInstance* owner = unit->owner_ ? unit->owner_ : inst;
       if (owner && owner->readBus(patch->dollarZeroStr(), temp, tick_size()))
@@ -221,7 +230,7 @@ void DSPServer::processTick() {
   PDInstance* inst = instance_manager.get(0);
   if (!inst) return;
   inst->processTick(TICK_RATIO);
-  for (UnitImpl *unit : UnitImpl::units__) {
+  for (dsp_detail::UnitImpl *unit : dsp_detail::UnitImpl::units__) {
     PDInstance* owner = unit->owner_ ? unit->owner_ : inst;
     if (!owner->readBus(unit->patch_->dollarZeroStr(), unit->buffer_, tick_size()))
       ; // FIXME houston...
@@ -230,7 +239,7 @@ void DSPServer::processTick() {
 
 void DSPServer::cleanUp() {
   while (true) {
-    auto pr = UnitImpl::to_be_closed();
+    auto pr = dsp_detail::UnitImpl::to_be_closed();
     if (pr.second == nullptr) break;
     PDInstance* owner = pr.first;
     Patch *patch = pr.second;

@@ -111,4 +111,12 @@ bool PDInstance::hasPatch(const std::string &dollar) const {
   return patches_.find(dollar) != patches_.end();
 }
 
+void PDInstance::registerUnit(dsp_detail::UnitImpl* unit) {
+  if (unit) units_.insert(unit);
+}
+
+void PDInstance::unregisterUnit(dsp_detail::UnitImpl* unit) {
+  if (unit) units_.erase(unit);
+}
+
 } // namespace vorpal

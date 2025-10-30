@@ -6,9 +6,14 @@
 #include <queue>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace vorpal {
+
+// Forward declaration to avoid circular dependency with dspserver.h
+class DSPServer;
+namespace dsp_detail { class UnitImpl; }
 
 struct PdCommand {
   std::string receiver; // e.g., "$0-command"
@@ -53,6 +58,11 @@ public:
   // Check whether a loaded patch with given dollarZero exists
   bool hasPatch(const std::string &dollar) const;
 
+  // Unit registry management (for DSPServer::UnitImpl)
+  void registerUnit(dsp_detail::UnitImpl* unit);
+  void unregisterUnit(dsp_detail::UnitImpl* unit);
+  const std::unordered_set<dsp_detail::UnitImpl*>& units() const { return units_; }
+
 private:
   int id_ = 0;
   pd::PdBase pd_;
@@ -61,6 +71,7 @@ private:
   std::vector<std::string> search_paths_;
   std::unordered_map<std::string, pd::Patch> patches_; // key = $0 string
   std::queue<PdCommand> commands_;
+  std::unordered_set<dsp_detail::UnitImpl*> units_; // Per-instance unit registry
 };
 
 } // namespace vorpal

@@ -17,8 +17,13 @@ namespace vorpal { class PDInstance; }
 
 namespace vorpal {
 
-// Forwatd declaration
+// Forward declaration
 class DSPUnit;
+
+// Detail namespace for internal DSPServer implementation
+namespace dsp_detail {
+  class UnitImpl;
+}
 
 class DSPServer {
  public:
@@ -34,8 +39,11 @@ class DSPServer {
   void cleanUp();
   void finish();
  private:
-  class UnitImpl;
-  static std::unordered_set<UnitImpl*> units__;
+  // UnitImpl is now in dsp_detail namespace and needs access to private statics
+  friend class dsp_detail::UnitImpl;
+  
+  // UnitImpl is now in dsp_detail namespace
+  static std::unordered_set<dsp_detail::UnitImpl*> units__;
 
   // Previously file-global state moved here as static members
   static bool started;
