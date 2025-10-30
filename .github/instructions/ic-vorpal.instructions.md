@@ -582,3 +582,8 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
 - [ ] Step 4: Engine changes for multi-instance tick and event grouping — https://github.com/haruo-gabriel/vorpal/issues/4
 - [ ] Step 5: Godot GDExtension API surface for instances — https://github.com/haruo-gabriel/vorpal/issues/5
 - [ ] Step 6: Testing and Acceptance Criteria — https://github.com/haruo-gabriel/vorpal/issues/6
+
+## Next improvements:
+- Convert UnitImpl::units__ into a per-instance registry if you expect lots of instances (reduces global scans).
+- Update loadUnit to accept an instance_id argument and create units on arbitrary instances (Godot API update).
+- Add DSPServer instance-level methods if you want to limit access to these statics.

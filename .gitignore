@@ -5,3 +5,5 @@
 /install
 
 /.vscode
+.github/instructions/ic-vorpal.instructions.md
+src/vorpal/vorpal.code-workspace
