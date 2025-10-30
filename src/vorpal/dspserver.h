@@ -41,9 +41,6 @@ class DSPServer {
  private:
   // UnitImpl is now in dsp_detail namespace and needs access to private statics
   friend class dsp_detail::UnitImpl;
-  
-  // UnitImpl is now in dsp_detail namespace
-  static std::unordered_set<dsp_detail::UnitImpl*> units__;
 
   // Previously file-global state moved here as static members
   static bool started;

@@ -95,14 +95,10 @@ class UnitImpl final : public DSPUnit {
   Patch                           *patch_;
   PDInstance                      *owner_;
   vector<float>                   buffer_;
-  static unordered_set<UnitImpl*> units__;
 };
-
-unordered_set<UnitImpl*> UnitImpl::units__;
 
 UnitImpl::UnitImpl(Patch *patch, PDInstance* owner)
   : patch_(patch), owner_(owner), buffer_(Engine::TICK_BUFFER_SIZE, 0.0f) {
-  units__.insert(this);
   // Register with the owning instance's per-instance registry
   if (owner_) owner_->registerUnit(this);
 }
@@ -110,8 +106,7 @@ UnitImpl::UnitImpl(Patch *patch, PDInstance* owner)
 UnitImpl::~UnitImpl() {
   // Unregister from the owning instance's per-instance registry
   if (owner_) owner_->unregisterUnit(this);
-  ::vorpal::DSPServer::to_be_closed__.emplace_back(owner_, patch_);
-  units__.erase(this);
+  DSPServer::to_be_closed__.emplace_back(owner_, patch_);
 }
 
 void UnitImpl::transferSignal(shared_ptr<AudioUnit> audio_unit) {
