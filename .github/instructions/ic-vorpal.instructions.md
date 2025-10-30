@@ -587,16 +587,74 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
   - ✅ Per-instance unit registry for true isolation
   - ✅ Tests pass: instancemanager_test, pdinstance_test, pd_multi_test
 - [x] Step 3: Introduce InstanceManager — https://github.com/haruo-gabriel/vorpal/issues/3 ✅ COMPLETE
-  - ✅ InstanceManager class implemented with create/destroy/get methods
-  - ✅ Integrated into DSPServer
+  - ✅ InstanceManager class implemented with `Map<int, unique_ptr<PDInstance>>`
+  - ✅ Integrated into DSPServer as static member
   - ✅ Default instance (id=0) for backward compatibility
+  - ✅ Methods: `createInstance(id, paths)`, `destroyInstance(id)`, `get(id)`, `ids()`
+  - ✅ Graceful failure handling (returns false on creation failure)
+  - ✅ Tests pass: instancemanager_test validates create/destroy/get/duplicate detection
+  - ⚠️ **API Note**: Current design uses manual ID assignment (`createInstance(int id, ...)`). WARP spec suggests auto-ID generation. Consider adding auto-ID overload in future.
 - [ ] Step 4: Engine changes for multi-instance tick and event grouping — https://github.com/haruo-gabriel/vorpal/issues/4
+  - Implement `Engine::createInstance(paths)` → delegates to InstanceManager
+  - Implement `Engine::destroyInstance(id)`
+  - Modify `Engine::eventInstance(path, out, instance_id=0)` to bind events to instances
+  - Update tick loop to iterate all instances via InstanceManager
+  - Group events by instance for efficient processing
 - [ ] Step 5: Godot GDExtension API surface for instances — https://github.com/haruo-gabriel/vorpal/issues/5
+  - Expose `VORPALModule::create_instance()` in GDScript
+  - Expose `VORPALModule::destroy_instance(instance_id)`
+  - Update `VORPALModule::event_instance(name, instance_id=0)` with default parameter
+  - Update GDExtension bindings (_bind_methods)
 - [ ] Step 6: Testing and Acceptance Criteria — https://github.com/haruo-gabriel/vorpal/issues/6
+  - Integration test: Two instances, same patch, different commands, verify isolation
+  - Stress test: Burst events across multiple instances
+  - Performance test: CPU scaling with instance count
+  - Audio quality test: No dropouts with 2+ concurrent instances
+
+## Current Architecture Status (as of Issue #3 completion)
+
+### ✅ Completed Components
+- **PDInstance**: Per-instance libpd wrapper with isolated state (patches, commands, units)
+- **InstanceManager**: Registry and lifecycle management for PDInstance objects
+- **DSPServer**: Refactored to use InstanceManager; per-instance processing loops
+- **Per-instance unit registry**: Units register with owning instance for O(N+M) performance
+
+### 🔄 In Progress / Next Steps
+- **Engine API**: Need to expose instance management methods (create/destroy/eventInstance)
+- **Godot Bindings**: VORPALModule GDExtension wrapper needs multi-instance API
+- **Unit Creation**: `loadUnit` should accept `instance_id` parameter (currently hardcoded to instance 0)
+- **Event Binding**: Events need explicit instance assignment in Engine
+
+### 📋 Remaining Work
+
+#### Immediate Next Steps (Priority Order)
+1. **Update DSPServer::loadUnit API** to accept instance_id parameter
+   - Change signature: `loadUnit(path, instance_id=0)`
+   - Allow creating units on arbitrary instances
+   - Maintains backward compatibility with default instance_id=0
+
+2. **Implement Engine multi-instance methods**
+   - `Engine::createInstance(paths)` → returns instance_id
+   - `Engine::destroyInstance(id)`
+   - `Engine::eventInstance(path, out, instance_id=0)`
+   - Update Engine tick loop to process all instances
+
+3. **Expose to Godot GDExtension**
+   - VORPALModule wrapper methods
+   - GDScript bindings
+   - Example usage in demo project
+
+4. **Testing & Documentation**
+   - Multi-instance integration tests
+   - Performance benchmarks
+   - Update API documentation
 
 ## Next improvements:
 - ✅ ~~Convert UnitImpl::units__ into a per-instance registry~~ **DONE** (completed as part of Issue #2)
-- Update loadUnit to accept an instance_id argument and create units on arbitrary instances (Godot API update).
-- Add DSPServer instance-level methods if you want to limit access to these statics.
-- Implement Engine::eventInstance() to bind events to specific instances.
-- Expose multi-instance API to Godot GDExtension (VORPALModule).
+- **Update loadUnit to accept instance_id argument** ← NEXT PRIORITY
+  - Modify `DSPServer::loadUnit(path, instance_id=0)` signature
+  - Route unit creation to specified instance
+  - Update Engine and VORPALModule callers
+- Add Engine::eventInstance() to bind events to specific instances
+- Expose multi-instance API to Godot GDExtension (VORPALModule)
+- Consider adding auto-ID overload: `InstanceManager::createInstance(paths)` returns int

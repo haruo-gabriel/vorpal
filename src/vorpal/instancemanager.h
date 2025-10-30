@@ -12,11 +12,21 @@ public:
   InstanceManager() {}
   ~InstanceManager() { instances_.clear(); }
 
+  // Auto-generate ID version (WARP spec) - returns instance_id or -1 on failure
+  int createInstance(const std::vector<std::string>& paths = {}, int sample_rate = 44100) {
+    const int id = next_id_++;
+    if (!createInstance(id, paths, sample_rate)) {
+      return -1;
+    }
+    return id;
+  }
+
+  // Manual ID version (internal helper) - returns true on success
   bool createInstance(int id, const std::vector<std::string>& paths = {}, int sample_rate = 44100) {
     if (instances_.count(id)) return false;
-  std::unique_ptr<PDInstance> inst(new PDInstance(id));
-  if (!inst->start(paths, sample_rate, true, 0, 2)) return false;
-  instances_.emplace(id, std::move(inst));
+    std::unique_ptr<PDInstance> inst(new PDInstance(id));
+    if (!inst->start(paths, sample_rate, true, 0, 2)) return false;
+    instances_.emplace(id, std::move(inst));
     return true;
   }
 
@@ -51,6 +61,7 @@ public:
   }
 
 private:
+  int next_id_ = 1;  // Start from 1; 0 is reserved for default instance
   std::map<int, std::unique_ptr<PDInstance>> instances_;
 };
 
