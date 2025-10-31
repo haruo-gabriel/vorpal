@@ -675,6 +675,8 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
 - **Future (Issue #5)**: Godot GDExtension bindings for multi-instance API
 
 ### 📋 Remaining Work
+Loading video...
+
 
 #### Immediate Next Steps (Priority Order) - Issue #4
 

@@ -23,6 +23,7 @@ namespace vorpal {
 namespace {
 
 using std::make_shared;
+using std::map;
 using std::ofstream;
 using std::ostream;
 using std::shared_ptr;
@@ -37,7 +38,7 @@ using std::weak_ptr;
 ALCdevice                         *device = nullptr;
 ALCcontext                        *context = nullptr;
 unique_ptr<AudioServer>           audioserver;
-vector<weak_ptr<SoundtrackEvent>> events__;
+map<int, vector<weak_ptr<SoundtrackEvent>>> events_by_inst__;
 double                            lag__ = 0.0;
 long long unsigned                tick_counter__ = 0;
 bool                              playing_started = false;
@@ -48,6 +49,14 @@ void printSample(ostream &out, float sample) {
   for (int i = 0; i < n; ++i)
     out << "#";
   out << std::endl;
+}
+
+size_t totalEventCount() {
+  size_t count = 0;
+  for (const auto& pair : events_by_inst__) {
+    count += pair.second.size();
+  }
+  return count;
 }
 
 } // unnamed namespace
@@ -132,19 +141,27 @@ void Engine::tick(double dt) {
   dsp.cleanUp(instances_);
   dsp.handleCommands(instances_);
   out << "[VORPAL] update by " << dt << " seconds" << std::endl;
-  while (lag__ >= TICK && audioserver->availableBuffers() >= events__.size()) {
+  while (lag__ >= TICK && audioserver->availableBuffers() >= totalEventCount()) {
     out << "[VORPAL] tick " << tick_counter__ << "("
         << audioserver->availableBuffers() << " available buffers)"
         << std::endl;
     dsp.processTick(instances_);
-    shared_ptr<SoundtrackEvent> event;
-    size_t idx = 0;
-    for (weak_ptr<SoundtrackEvent> weak : events__) {
-      if ((event = weak.lock())) {
-        out << "[VORPAL] processing event " << idx << std::endl;
-        event->processAudio();
-      } else out << "[VORPAL] dead event " << idx << std::endl;
-      ++idx;
+    
+    // Process events grouped by instance
+    for (auto& pair : events_by_inst__) {
+      int instance_id = pair.first;
+      auto& events = pair.second;
+      size_t idx = 0;
+      for (weak_ptr<SoundtrackEvent> weak : events) {
+        shared_ptr<SoundtrackEvent> event;
+        if ((event = weak.lock())) {
+          out << "[VORPAL] processing event " << idx << " (instance " << instance_id << ")" << std::endl;
+          event->processAudio();
+        } else {
+          out << "[VORPAL] dead event " << idx << " (instance " << instance_id << ")" << std::endl;
+        }
+        ++idx;
+      }
     }
     lag__ -= TICK;
     ++tick_counter__;
@@ -163,7 +180,7 @@ Status Engine::eventInstance(const string &path_to_dspunit,
     return Status::FAILURE("Could not load Audio Unit: "
                            + audiounit->status().description());
   *event_out = make_shared<SoundtrackEvent>(dspunit, audiounit);
-  events__.emplace_back(*event_out);
+  events_by_inst__[instance_id].emplace_back(*event_out);
   return Status::OK("Soundtrack event successfully created");
 }
 
