@@ -42,7 +42,7 @@ int main() {
     std::cout << "Failed to create event with implicit default: " << status_implicit.description() << std::endl;
   }
   
-  // Test 3: Create a new instance using Engine API (Phase 2!)
+  // Test 3: Create a new instance using Engine API (Phase 2)
   int inst1 = engine.createInstance(paths);
   if (inst1 > 0) {
     std::cout << "Created new instance via Engine::createInstance(): " << inst1 << std::endl;
@@ -60,7 +60,7 @@ int main() {
     std::cout << "Failed to create event on instance " << inst1 << ": " << status1.description() << std::endl;
   }
   
-  // Test 5: Attempt to create event on non-existent instance (should fail gracefully)
+  // Test 5: Attempt to create event on non-existent instance (should fail)
   std::shared_ptr<SoundtrackEvent> event_invalid;
   Status status_invalid = engine.eventInstance("vorpal_core", &event_invalid, 999);
   if (!status_invalid.ok()) {
@@ -87,7 +87,7 @@ int main() {
   engine.finish();
   
   std::cout << "\nEngine multi-instance event creation test finished" << std::endl;
-  std::cout << "Phase 2 complete: Engine owns InstanceManager and exposes createInstance/destroyInstance!" << std::endl;
+  std::cout << "Phase 2 complete: Engine owns InstanceManager and exposes createInstance/destroyInstance" << std::endl;
   
   return 0;
 }

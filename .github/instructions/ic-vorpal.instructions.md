@@ -12,6 +12,18 @@ This document is the authoritative plan for implementing Pure Data (libpd) multi
 
 ---
 
+## Coding Guidelines
+
+### Comment Style
+- Use objective, formal language in all code comments
+- Avoid exclamation marks, informal punctuation, and colloquial expressions
+- Avoid subjective adverbs such as "gracefully", "easily", "simply", etc.
+- State facts directly without emotional emphasis
+- Example (incorrect): `// Create a new instance using Engine API (Phase 2!)`
+- Example (correct): `// Create a new instance using Engine API (Phase 2)`
+
+---
+
 ## Table of Contents
 - 1. Purpose and Scope
 - 2. System Requirements
