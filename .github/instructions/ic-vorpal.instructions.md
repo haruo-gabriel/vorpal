@@ -590,16 +590,20 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
   - ✅ InstanceManager class implemented with `Map<int, unique_ptr<PDInstance>>`
   - ✅ Integrated into DSPServer as static member
   - ✅ Default instance (id=0) for backward compatibility
-  - ✅ Methods: `createInstance(id, paths)`, `destroyInstance(id)`, `get(id)`, `ids()`
-  - ✅ Graceful failure handling (returns false on creation failure)
+  - ✅ Auto-ID generation API: `createInstance(paths)` returns int (WARP spec compliant)
+  - ✅ Manual ID API: `createInstance(id, paths)` for internal use
+  - ✅ Methods: `destroyInstance(id)`, `get(id)`, `ids()`, `defaultInstance()`, `findInstanceByPatchDollar()`
+  - ✅ Graceful failure handling (returns -1 or false on creation failure)
   - ✅ Tests pass: instancemanager_test validates create/destroy/get/duplicate detection
-  - ⚠️ **API Note**: Current design uses manual ID assignment (`createInstance(int id, ...)`). WARP spec suggests auto-ID generation. Consider adding auto-ID overload in future.
 - [ ] Step 4: Engine changes for multi-instance tick and event grouping — https://github.com/haruo-gabriel/vorpal/issues/4
-  - Implement `Engine::createInstance(paths)` → delegates to InstanceManager
-  - Implement `Engine::destroyInstance(id)`
-  - Modify `Engine::eventInstance(path, out, instance_id=0)` to bind events to instances
-  - Update tick loop to iterate all instances via InstanceManager
-  - Group events by instance for efficient processing
+  - ⚠️ **Architectural Note**: InstanceManager currently owned by DSPServer (static member), but WARP §7.3 specifies Engine should own it
+  - **Phase 1**: Update `DSPServer::loadUnit(path, instance_id=0)` to accept instance parameter
+  - **Phase 2**: Move InstanceManager ownership from DSPServer to Engine (aligns with WARP spec)
+  - **Phase 3**: Implement `Engine::createInstance(paths)` → delegates to InstanceManager
+  - **Phase 3**: Implement `Engine::destroyInstance(id)` → delegates to InstanceManager
+  - **Phase 3**: Modify `Engine::eventInstance(path, out, instance_id=0)` to bind events to instances
+  - **Phase 4**: Update tick loop to iterate all instances via InstanceManager
+  - **Phase 4**: Group events by instance_id: `std::map<int, std::vector<std::shared_ptr<SoundtrackEvent>>> events_by_inst_`
 - [ ] Step 5: Godot GDExtension API surface for instances — https://github.com/haruo-gabriel/vorpal/issues/5
   - Expose `VORPALModule::create_instance()` in GDScript
   - Expose `VORPALModule::destroy_instance(instance_id)`
@@ -615,46 +619,79 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
 
 ### ✅ Completed Components
 - **PDInstance**: Per-instance libpd wrapper with isolated state (patches, commands, units)
-- **InstanceManager**: Registry and lifecycle management for PDInstance objects
-- **DSPServer**: Refactored to use InstanceManager; per-instance processing loops
+- **InstanceManager**: Registry and lifecycle management for PDInstance objects with auto-ID generation
+- **DSPServer**: Refactored to use InstanceManager (as static member); per-instance processing loops
 - **Per-instance unit registry**: Units register with owning instance for O(N+M) performance
 
-### 🔄 In Progress / Next Steps
-- **Engine API**: Need to expose instance management methods (create/destroy/eventInstance)
-- **Godot Bindings**: VORPALModule GDExtension wrapper needs multi-instance API
-- **Unit Creation**: `loadUnit` should accept `instance_id` parameter (currently hardcoded to instance 0)
-- **Event Binding**: Events need explicit instance assignment in Engine
+### ⚠️ Architectural Gap (Issue #4 Scope)
+**Current Reality:**
+- ✅ InstanceManager **exists** and works correctly
+- ⚠️ InstanceManager **owned by DSPServer** (as `static InstanceManager instance_manager`)
+- ❌ Engine does **NOT** own InstanceManager (WARP §7.3 expects `Engine::instances_` member)
+- ❌ `DSPServer::loadUnit(path)` hardcoded to instance 0
+- ❌ `Engine::eventInstance(path, out)` has no instance_id parameter
+- ❌ `Engine::tick()` only processes default instance (0)
+
+**Target Architecture (WARP §4, §7.3):**
+- Engine should own `InstanceManager instances_` member
+- Engine exposes `createInstance()` / `destroyInstance()` / `eventInstance(path, out, instance_id=0)`
+- DSPServer becomes utility layer (no static InstanceManager)
+- Multi-instance tick processing in Engine
+
+### 🔄 In Progress / Next Steps (Issue #4)
+- **Phase 1**: Update `DSPServer::loadUnit` to accept instance_id parameter
+- **Phase 2**: Move InstanceManager ownership from DSPServer to Engine
+- **Phase 3**: Engine exposes multi-instance API (create/destroy/eventInstance with instance_id)
+- **Phase 4**: Multi-instance tick processing and event grouping in Engine
+- **Future (Issue #5)**: Godot GDExtension bindings for multi-instance API
 
 ### 📋 Remaining Work
 
-#### Immediate Next Steps (Priority Order)
-1. **Update DSPServer::loadUnit API** to accept instance_id parameter
-   - Change signature: `loadUnit(path, instance_id=0)`
-   - Allow creating units on arbitrary instances
-   - Maintains backward compatibility with default instance_id=0
+#### Immediate Next Steps (Priority Order) - Issue #4
 
-2. **Implement Engine multi-instance methods**
-   - `Engine::createInstance(paths)` → returns instance_id
-   - `Engine::destroyInstance(id)`
-   - `Engine::eventInstance(path, out, instance_id=0)`
-   - Update Engine tick loop to process all instances
+**Phase 1: DSPServer::loadUnit API Update**
+1. Change signature: `shared_ptr<DSPUnit> loadUnit(const string& path, int instance_id=0)`
+2. Route unit creation to `instance_manager.get(instance_id)->loadPatch()`
+3. Update callers: `Engine::eventInstance()` must pass instance_id
+4. Maintain backward compatibility with default instance_id=0
 
-3. **Expose to Godot GDExtension**
-   - VORPALModule wrapper methods
-   - GDScript bindings
-   - Example usage in demo project
+**Phase 2: Move InstanceManager to Engine (Architectural Refactor)**
+1. Add `InstanceManager instances_;` member to Engine class (private)
+2. Remove `static InstanceManager instance_manager` from DSPServer
+3. Update `DSPServer::start()` to accept InstanceManager reference or instance_id
+4. Update `DSPServer::loadUnit()` to accept InstanceManager reference
+5. Pass Engine's InstanceManager to DSPServer methods where needed
 
-4. **Testing & Documentation**
-   - Multi-instance integration tests
-   - Performance benchmarks
-   - Update API documentation
+**Phase 3: Engine Multi-Instance API**
+1. Implement `int Engine::createInstance(paths)` → delegates to `instances_.createInstance(paths)`
+2. Implement `void Engine::destroyInstance(id)` → delegates to `instances_.destroyInstance(id)`
+3. Modify `Status Engine::eventInstance(path, out, instance_id=0)` signature
+4. Group events: replace `vector<weak_ptr<SoundtrackEvent>> events__` with `map<int, vector<...>> events_by_inst_`
+
+**Phase 4: Multi-Instance Tick Processing**
+1. Update `Engine::tick(dt)` to iterate `instances_.ids()`
+2. Per instance: call `handleCommands()` → `processTick()`
+3. Process events grouped by instance_id
+4. Stream per-instance audio to OpenAL
+
+**Future (Issue #5): Godot GDExtension**
+- VORPALModule wrapper methods
+- GDScript bindings
+- Example usage in demo project
 
 ## Next improvements:
 - ✅ ~~Convert UnitImpl::units__ into a per-instance registry~~ **DONE** (completed as part of Issue #2)
-- **Update loadUnit to accept instance_id argument** ← NEXT PRIORITY
+- ✅ ~~Add auto-ID overload: `InstanceManager::createInstance(paths)` returns int~~ **DONE** (completed in Issue #3)
+- **Issue #4 Phase 1: Update loadUnit to accept instance_id argument** ← CURRENT PRIORITY
   - Modify `DSPServer::loadUnit(path, instance_id=0)` signature
-  - Route unit creation to specified instance
-  - Update Engine and VORPALModule callers
-- Add Engine::eventInstance() to bind events to specific instances
-- Expose multi-instance API to Godot GDExtension (VORPALModule)
-- Consider adding auto-ID overload: `InstanceManager::createInstance(paths)` returns int
+  - Route unit creation to specified instance via `instance_manager.get(instance_id)`
+  - Update Engine caller: `Engine::eventInstance()` must pass instance_id parameter
+- **Issue #4 Phase 2: Move InstanceManager from DSPServer to Engine** ← ARCHITECTURAL REFACTOR
+  - Current: DSPServer owns `static InstanceManager instance_manager`
+  - Target: Engine owns `InstanceManager instances_` (per WARP §7.3)
+  - Requires updating DSPServer methods to accept InstanceManager reference
+- **Issue #4 Phase 3-4: Engine multi-instance tick and event grouping**
+  - Add `Engine::createInstance()` / `Engine::destroyInstance()` API
+  - Modify `Engine::eventInstance(path, out, instance_id=0)` to bind events to instances
+  - Update `Engine::tick()` to process all instances
+- **Issue #5: Expose multi-instance API to Godot GDExtension (VORPALModule)**
