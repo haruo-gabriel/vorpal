@@ -72,10 +72,12 @@ class Engine {
   /**
    * @param path_to_event File path to event data
    * @param event_out Pointer to event output variable
+   * @param instance_id PDInstance ID to bind the event to (default 0)
    * @return Status Whether the event was successfully created or not
    */
   Status eventInstance(const std::string &path_to_event,
-                       std::shared_ptr<SoundtrackEvent> *event_out);
+                       std::shared_ptr<SoundtrackEvent> *event_out,
+                       int instance_id = 0);
 
   const static size_t TICK_BUFFER_SIZE;
 };
