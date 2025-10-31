@@ -3,6 +3,7 @@
 #define LIBODA_ODA_ENGINE_H_
 
 #include <vorpal/status.h>
+#include <vorpal/instancemanager.h>
 
 #include <memory>
 #include <string>
@@ -79,7 +80,29 @@ class Engine {
                        std::shared_ptr<SoundtrackEvent> *event_out,
                        int instance_id = 0);
 
+  /// Creates a new PDInstance
+  /**
+   * @param paths Search paths for Pure Data patches
+   * @return Instance ID (>= 1) on success, -1 on failure
+   */
+  int createInstance(const std::vector<std::string>& paths = {});
+
+  /// Destroys a PDInstance
+  /**
+   * @param instance_id ID of the instance to destroy
+   */
+  void destroyInstance(int instance_id);
+
+  /// Gets the InstanceManager (for DSPServer access)
+  /**
+   * @return Reference to the internal InstanceManager
+   */
+  InstanceManager& instanceManager() { return instances_; }
+
   const static size_t TICK_BUFFER_SIZE;
+
+ private:
+  InstanceManager instances_;
 };
  
 } // namespace vorpal

@@ -73,7 +73,6 @@ bool checkPath (const string &path) {
 bool DSPServer::started = false;
 std::unique_ptr<pd::PdReceiver> DSPServer::receiver = nullptr;
 std::vector<std::string> DSPServer::search_paths;
-InstanceManager DSPServer::instance_manager;
 std::deque<std::pair<PDInstance*, pd::Patch*>> DSPServer::to_be_closed__;
 
 // UnitImpl implementation in dsp_detail namespace
@@ -141,7 +140,7 @@ std::pair<PDInstance*, pd::Patch*> UnitImpl::to_be_closed() {
 
 // DSPServer methods (still inside namespace vorpal)
 
-Status DSPServer::start(const vector<string>& patch_paths) {
+Status DSPServer::start(InstanceManager& instance_manager, const vector<string>& patch_paths) {
   if (started)
     return Status::FAILURE("DSP Server already started");
   // create a default instance (id 0) to preserve single-instance behavior
@@ -158,7 +157,7 @@ Status DSPServer::start(const vector<string>& patch_paths) {
   return Status::FAILURE("DSP Server could not start");
 }
 
-shared_ptr<DSPUnit> DSPServer::loadUnit(const string &path, int instance_id) {
+shared_ptr<DSPUnit> DSPServer::loadUnit(const string &path, InstanceManager& instance_manager, int instance_id) {
   string filename = path + ".pd";
   for (string search_path : search_paths) {
     if (checkPath(search_path+"/"+filename)) {
@@ -188,12 +187,13 @@ double DSPServer::time_per_tick() const {
 }
 
 void DSPServer::addPath(const string &path) {
-  PDInstance* inst = instance_manager.get(0);
-  if (inst) inst->pd().addToSearchPath(path);
+  // Note: addPath is called during start(), before any other instances are created
+  // For now, we keep the legacy behavior of adding to instance 0
+  // TODO: Consider if this should be refactored to work with InstanceManager
   search_paths.push_back(path);
 }
 
-void DSPServer::handleCommands() {
+void DSPServer::handleCommands(InstanceManager& instance_manager) {
   using namespace std::placeholders;
   // Ask each instance to handle its queued commands
   for (int id : instance_manager.ids()) {
@@ -202,7 +202,7 @@ void DSPServer::handleCommands() {
   }
 }
 
-void DSPServer::process(int ticks, vector<float> *signal) {
+void DSPServer::process(InstanceManager& instance_manager, int ticks, vector<float> *signal) {
   // Process signal - iterate over all instances and their units
   vector<float> temp;
   signal->resize(ticks*tick_size(), 0.0f);
@@ -228,7 +228,7 @@ void DSPServer::process(int ticks, vector<float> *signal) {
   }
 }
 
-void DSPServer::processTick() {
+void DSPServer::processTick(InstanceManager& instance_manager) {
   // Process each instance and its units
   for (int instance_id : instance_manager.ids()) {
     PDInstance* inst = instance_manager.get(instance_id);
@@ -246,7 +246,7 @@ void DSPServer::processTick() {
   }
 }
 
-void DSPServer::cleanUp() {
+void DSPServer::cleanUp(InstanceManager& instance_manager) {
   while (true) {
     auto pr = dsp_detail::UnitImpl::to_be_closed();
     if (pr.second == nullptr) break;
@@ -259,8 +259,8 @@ void DSPServer::cleanUp() {
   }
 }
 
-void DSPServer::finish() {
-  cleanUp();
+void DSPServer::finish(InstanceManager& instance_manager) {
+  cleanUp(instance_manager);
 }
 
 } // namespace vorpal

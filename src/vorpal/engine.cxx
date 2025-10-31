@@ -76,7 +76,7 @@ Status Engine::start(const vector<string>& patch_paths) {
     return Status::FAILURE("Could not set a context");
   }
   // Start DSP server
-  Status dsp_start = DSPServer().start(patch_paths);
+  Status dsp_start = DSPServer().start(instances_, patch_paths);
   if (!dsp_start.ok()) {
     alcDestroyContext(context);
     alcCloseDevice(device);
@@ -110,7 +110,7 @@ void Engine::finish() {
   // Do not finish if it was not started yet
   if (!context) return;
   // Finish DSP server
-  DSPServer().finish();
+  DSPServer().finish(instances_);
   // Destroy audio audioserver
   audioserver->stopSource(0);
   audioserver.reset();
@@ -129,14 +129,14 @@ void Engine::tick(double dt) {
   lag__ += dt;
   // How many dsp ticks are needed for N seconds
   audioserver->update();
-  dsp.cleanUp();
-  dsp.handleCommands();
+  dsp.cleanUp(instances_);
+  dsp.handleCommands(instances_);
   out << "[VORPAL] update by " << dt << " seconds" << std::endl;
   while (lag__ >= TICK && audioserver->availableBuffers() >= events__.size()) {
     out << "[VORPAL] tick " << tick_counter__ << "("
         << audioserver->availableBuffers() << " available buffers)"
         << std::endl;
-    dsp.processTick();
+    dsp.processTick(instances_);
     shared_ptr<SoundtrackEvent> event;
     size_t idx = 0;
     for (weak_ptr<SoundtrackEvent> weak : events__) {
@@ -154,7 +154,7 @@ void Engine::tick(double dt) {
 Status Engine::eventInstance(const string &path_to_dspunit,
                              shared_ptr<SoundtrackEvent> *event_out,
                              int instance_id) {
-  shared_ptr<DSPUnit> dspunit = DSPServer().loadUnit(path_to_dspunit, instance_id);
+  shared_ptr<DSPUnit> dspunit = DSPServer().loadUnit(path_to_dspunit, instances_, instance_id);
   if (!dspunit->status().ok())
     return Status::FAILURE("Could not load DSP Unit: "
                            + dspunit->status().description());
@@ -165,6 +165,14 @@ Status Engine::eventInstance(const string &path_to_dspunit,
   *event_out = make_shared<SoundtrackEvent>(dspunit, audiounit);
   events__.emplace_back(*event_out);
   return Status::OK("Soundtrack event successfully created");
+}
+
+int Engine::createInstance(const std::vector<std::string>& paths) {
+  return instances_.createInstance(paths);
+}
+
+void Engine::destroyInstance(int instance_id) {
+  instances_.destroyInstance(instance_id);
 }
 
 } // namespace vorpal
