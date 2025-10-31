@@ -1,6 +1,20 @@
 # VORPAL Multi-Instance Testing Review
 **Date**: October 31, 2025  
-**Status**: Issue #4 Complete - Comprehensive Test Gap Analysis
+**Status**: Issue #4 Complete - All 6 Tests Passing
+
+---
+
+## ✅ Session Summary (2024-12-XX)
+
+**Objective**: Implement command routing isolation test to verify multi-instance support completeness.
+
+**Deliverable**: Created `command_routing_test.cpp` with comprehensive validation of per-instance command isolation.
+
+**Final Results**:
+- ✅ All 6 tests pass successfully
+- ✅ Command routing fully isolated per instance  
+- ✅ No cross-talk between instances verified
+- ✅ Audio output independence confirmed
 
 ---
 
@@ -21,22 +35,19 @@ This document provides a complete review of the current test suite for VORPAL's 
 | **instancemanager_test** | `instancemanager_test.cpp` | 77 | ✅ | ✅ PASS | InstanceManager lifecycle and negative tests |
 | **instancemanager_autoid_test** | `instancemanager_autoid_test.cpp` | 119 | ✅ | ✅ PASS | Auto-ID generation and sequential IDs |
 | **engine_multiinstance_test** | `engine_multiinstance_test.cpp` | 94 | ✅ | ✅ PASS | Engine API, event creation, dangling pointer fix |
+| **command_routing_test** | `command_routing_test.cpp` | 150+ | ✅ | ✅ PASS | **Command routing isolation - PRIMARY FUNCTIONAL TEST** |
 
 ### Test Results Summary
 
-```text
+All 6 tests passing:
+
+```
 ✅ pd_multi_test:                PASS (libpd: 3 instances, init works)
 ✅ pdinstance_test:              PASS (6 instances isolated, array I/O verified)
 ✅ instancemanager_test:         PASS (create/destroy/duplicate/missing patch)
 ✅ instancemanager_autoid_test:  PASS (auto-ID generation, sequential, coexistence)
 ✅ engine_multiinstance_test:    PASS (Engine API, instance destruction safe)
-```
-```
-✅ pd_multi_test:                PASS (libpd: 3 instances, init works)
-✅ pdinstance_test:              PASS (6 instances isolated, array I/O verified)
-✅ instancemanager_test:         PASS (create/destroy/duplicate/missing patch)
-✅ engine_multiinstance_test:    PASS (Engine API, instance destruction safe)
-❓ instancemanager_autoid_test:  NOT BUILT (exists but not in CMakeLists.txt)
+✅ command_routing_test:         PASS (Command isolation verified, no cross-talk)
 ```
 
 ---

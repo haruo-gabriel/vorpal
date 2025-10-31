@@ -1,0 +1,11 @@
+#N canvas 100 100 450 300 10;
+#X obj 20 20 receive \$0-command;
+#X obj 20 60 route set-value;
+#X obj 20 100 f 0;
+#X obj 20 130 i;
+#X obj 20 160 tabwrite test-result-\$0 0;
+#X obj 200 200 table test-result-\$0 64;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;
+#X connect 2 0 3 0;
+#X connect 3 0 4 0;

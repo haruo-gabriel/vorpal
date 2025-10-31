@@ -11,6 +11,8 @@ add_executable(instancemanager_autoid_test instancemanager_autoid_test.cpp)
 
 add_executable(engine_multiinstance_test engine_multiinstance_test.cpp)
 
+add_executable(command_routing_test command_routing_test.cpp)
+
 target_include_directories(pdinstance_test PRIVATE
   ${CMAKE_BINARY_DIR}/externals/include/libpd
   ${CMAKE_BINARY_DIR}/externals/include/libpd/util
@@ -43,6 +45,14 @@ target_include_directories(engine_multiinstance_test PRIVATE
 
 target_link_libraries(engine_multiinstance_test PRIVATE pdcpp vorpal ${OPENAL_LIBRARY})
 
+target_include_directories(command_routing_test PRIVATE
+  ${CMAKE_BINARY_DIR}/externals/include/libpd
+  ${CMAKE_BINARY_DIR}/externals/include/libpd/util
+  ${CMAKE_SOURCE_DIR}/src/vorpal
+)
+
+target_link_libraries(command_routing_test PRIVATE pdcpp vorpal)
+
 target_compile_features(pdinstance_test PRIVATE cxx_std_11)
 
 target_compile_features(instancemanager_test PRIVATE cxx_std_11)
@@ -50,6 +60,8 @@ target_compile_features(instancemanager_test PRIVATE cxx_std_11)
 target_compile_features(instancemanager_autoid_test PRIVATE cxx_std_11)
 
 target_compile_features(engine_multiinstance_test PRIVATE cxx_std_11)
+
+target_compile_features(command_routing_test PRIVATE cxx_std_11)
 
 if(DEFINED ENABLE_LIBPD_MULTI AND ENABLE_LIBPD_MULTI)
   target_compile_definitions(pdinstance_test PRIVATE PDINSTANCE=1 PDTHREADS=1)
@@ -65,6 +77,10 @@ endif()
 
 if(DEFINED ENABLE_LIBPD_MULTI AND ENABLE_LIBPD_MULTI)
   target_compile_definitions(engine_multiinstance_test PRIVATE PDINSTANCE=1 PDTHREADS=1)
+endif()
+
+if(DEFINED ENABLE_LIBPD_MULTI AND ENABLE_LIBPD_MULTI)
+  target_compile_definitions(command_routing_test PRIVATE PDINSTANCE=1 PDTHREADS=1)
 endif()
 
 target_include_directories(pd_multi_test PRIVATE
