@@ -631,8 +631,13 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
     - ✅ `Engine::eventInstance(path, out, instance_id=0)` updated to pass instances_ to loadUnit
     - ✅ Tests pass: engine_multiinstance_test validates create/destroy/event-binding
     - ⚠️ Known Issue: Destroying instances with active units causes dangling pointer in to_be_closed__ queue (TODO for future)
-  - [ ] **Phase 4**: Update tick loop to iterate all instances via InstanceManager
-  - [ ] **Phase 4**: Group events by instance_id: `std::map<int, std::vector<std::shared_ptr<SoundtrackEvent>>> events_by_inst_`
+  - [x] **Phase 4**: Multi-instance tick processing and event grouping ✅ COMPLETE
+    - ✅ Replaced `vector<weak_ptr<SoundtrackEvent>> events__` with `map<int, vector<...>> events_by_inst__`
+    - ✅ Updated `Engine::eventInstance()` to add events to instance-specific group
+    - ✅ Modified `Engine::tick()` to iterate all instances via `instances_` map
+    - ✅ Per-instance event processing in tick loop
+    - ✅ Added `totalEventCount()` helper function
+    - ✅ Tests pass: instancemanager_test, pdinstance_test, engine_multiinstance_test
 - [ ] Step 5: Godot GDExtension API surface for instances — https://github.com/haruo-gabriel/vorpal/issues/5
   - Expose `VORPALModule::create_instance()` in GDScript
   - Expose `VORPALModule::destroy_instance(instance_id)`
@@ -644,7 +649,7 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
   - Performance test: CPU scaling with instance count
   - Audio quality test: No dropouts with 2+ concurrent instances
 
-## Current Architecture Status (as of Issue #4 Phase 2-3 completion)
+## Current Architecture Status (as of Issue #4 Phase 4 completion)
 
 ### ✅ Completed Components
 - **PDInstance**: Per-instance libpd wrapper with isolated state (patches, commands, units)
@@ -652,27 +657,30 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
 - **Engine**: Now owns InstanceManager and exposes multi-instance API (createInstance/destroyInstance)
 - **DSPServer**: Refactored to accept InstanceManager reference; no longer has static instance_manager
 - **Per-instance unit registry**: Units register with owning instance for O(N+M) performance
+- **Multi-instance tick processing**: Engine processes all instances and their events per tick
 
 ### ✅ Architectural Alignment (WARP §7.3)
-**Current Reality (as of Phase 2-3 completion):**
+**Current Reality (as of Phase 4 completion):**
 - ✅ InstanceManager **owned by Engine** (as `Engine::instances_` private member)
 - ✅ Engine **exposes multi-instance API**: `createInstance()`, `destroyInstance()`, `instanceManager()`
 - ✅ `DSPServer::loadUnit(path, instance_manager, instance_id=0)` **accepts InstanceManager reference**
 - ✅ `Engine::eventInstance(path, out, instance_id=0)` **accepts instance_id parameter**
 - ✅ DSPServer is now a utility layer (no static InstanceManager)
-- ⚠️ `Engine::tick()` processes all instances via InstanceManager (Phase 4 goal: per-instance event grouping)
+- ✅ `Engine::tick()` processes all instances via InstanceManager with per-instance event grouping
+- ✅ Events grouped by instance_id in `map<int, vector<weak_ptr<SoundtrackEvent>>> events_by_inst__`
 
 **Architecture Achievement:**
 - Matches WARP specification §7.3: Engine owns InstanceManager
 - Multi-instance API surface complete at C++ level
 - Backward compatibility maintained with default instance_id=0
+- Per-instance tick processing and event grouping implemented
 
 ### 🔄 In Progress / Next Steps (Issue #4)
 - ✅ **Phase 1 COMPLETE**: DSPServer::loadUnit and Engine::eventInstance accept instance_id parameter
-- ✅ **Phase 2 COMPLETE**: Move InstanceManager ownership from DSPServer to Engine (WARP alignment achieved!)
+- ✅ **Phase 2 COMPLETE**: Move InstanceManager ownership from DSPServer to Engine (WARP alignment achieved)
 - ✅ **Phase 3 COMPLETE**: Engine exposes multi-instance API (createInstance/destroyInstance)
-- ⏭️ **Phase 4 NEXT**: Multi-instance tick processing and event grouping in Engine ← CURRENT PRIORITY
-- **Future (Issue #5)**: Godot GDExtension bindings for multi-instance API
+- ✅ **Phase 4 COMPLETE**: Multi-instance tick processing and event grouping in Engine
+- **Next (Issue #5)**: Godot GDExtension bindings for multi-instance API ← CURRENT PRIORITY
 
 ### 📋 Remaining Work
 Loading video...
