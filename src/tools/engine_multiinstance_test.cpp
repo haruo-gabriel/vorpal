@@ -69,25 +69,25 @@ int main() {
     std::cout << "NEGATIVE TEST FAILED: Event should not be created on non-existent instance" << std::endl;
   }
   
-  // NOTE: Skipping instance destruction test for now
-  // TODO (Phase 3): Fix dangling pointer issue in to_be_closed__ queue when instances are destroyed
-  // The issue: UnitImpl destructor adds patches to static to_be_closed__ with raw PDInstance*
-  // If the PDInstance is destroyed before cleanUp(), we get dangling pointers
-  // Solution: Use weak_ptr or instance_id instead of raw pointer in to_be_closed__
+  // Test 6: Instance destruction with active units (previously caused dangling pointer)
+  std::cout << "\nTest 6: Destroying instance with active units" << std::endl;
   
-  std::cout << "\nNOTE: Instance destruction test skipped (dangling pointer issue)" << std::endl;
-  std::cout << "TODO: Fix to_be_closed__ queue to use instance_id instead of raw PDInstance*" << std::endl;
+  // Destroy instance 1 while event1 still exists
+  engine.destroyInstance(inst1);
+  std::cout << "Instance " << inst1 << " destroyed (event still exists)" << std::endl;
   
-  // Clean up all event references before engine.finish()
+  // Clean up event references
   event0.reset();
   event_implicit.reset();
-  event1.reset();
+  event1.reset();  // This triggers ~UnitImpl() which adds to to_be_closed__
   event_invalid.reset();
   
-  engine.finish();
+  std::cout << "All events cleaned up" << std::endl;
+  
+  engine.finish();  // This calls cleanUp(), which should safely handle deleted instance
   
   std::cout << "\nEngine multi-instance event creation test finished" << std::endl;
-  std::cout << "Phase 2 complete: Engine owns InstanceManager and exposes createInstance/destroyInstance" << std::endl;
+  std::cout << "SUCCESS: Dangling pointer issue fixed - instance destruction is now safe" << std::endl;
   
   return 0;
 }

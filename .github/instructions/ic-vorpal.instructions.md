@@ -630,7 +630,7 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
     - ✅ `Engine::instanceManager()` → accessor for DSPServer
     - ✅ `Engine::eventInstance(path, out, instance_id=0)` updated to pass instances_ to loadUnit
     - ✅ Tests pass: engine_multiinstance_test validates create/destroy/event-binding
-    - ⚠️ Known Issue: Destroying instances with active units causes dangling pointer in to_be_closed__ queue (TODO for future)
+    - ✅ **FIXED**: Dangling pointer issue resolved - `to_be_closed__` now uses instance_id instead of raw pointer
   - [x] **Phase 4**: Multi-instance tick processing and event grouping ✅ COMPLETE
     - ✅ Replaced `vector<weak_ptr<SoundtrackEvent>> events__` with `map<int, vector<...>> events_by_inst__`
     - ✅ Updated `Engine::eventInstance()` to add events to instance-specific group
@@ -710,13 +710,13 @@ Loading video...
 4. ✅ Modified `Status Engine::eventInstance(path, out, instance_id=0)` to pass instances_ to loadUnit
 5. ✅ Group events: replace `vector<weak_ptr<SoundtrackEvent>> events__` with `map<int, vector<...>> events_by_inst_` (partially done)
 6. ✅ Tests updated: engine_multiinstance_test validates createInstance/destroyInstance/event-binding
-7. ⚠️ Known Issue: Destroying instances with active units causes dangling pointer in to_be_closed__ queue (deferred to future work)
+7. ✅ **FIXED**: Dangling pointer issue resolved by using instance_id instead of raw pointer in `to_be_closed__`
 
-**Phase 4: Multi-Instance Tick Processing** ⏭️ NEXT
-1. Update `Engine::tick(dt)` to iterate `instances_.ids()`
-2. Per instance: call `handleCommands()` → `processTick()`
-3. Process events grouped by instance_id
-4. Stream per-instance audio to OpenAL
+**Phase 4: Multi-Instance Tick Processing** ✅ COMPLETE
+1. ✅ Updated `Engine::tick(dt)` to iterate `instances_.ids()`
+2. ✅ Per instance: calls `handleCommands()` → `processTick()`
+3. ✅ Process events grouped by instance_id
+4. ✅ Stream per-instance audio to OpenAL
 
 **Future (Issue #5): Godot GDExtension**
 - VORPALModule wrapper methods
@@ -738,6 +738,13 @@ Loading video...
   - ✅ Architectural alignment with WARP specification achieved
 - ✅ ~~Issue #4 Phase 3: Engine multi-instance API~~ **DONE**
   - ✅ `Engine::createInstance()` / `Engine::destroyInstance()` implemented
+  - ✅ Tests validate multi-instance event creation and binding
+  - ✅ **Dangling pointer fix**: Changed `to_be_closed__` from `pair<PDInstance*, Patch*>` to `pair<int, Patch*>`
+    - UnitImpl destructor now stores instance_id instead of raw pointer
+    - cleanUp() safely looks up instance via InstanceManager::get(id)
+    - Returns nullptr if instance was destroyed - no crash
+    - Test validates: destroy instance with active units → safe cleanup
+- ✅ ~~Issue #4 Phase 4: Multi-instance tick and event grouping~~ **DONE**
   - ✅ `Engine::instanceManager()` accessor added
   - ✅ Tests validate multi-instance event creation and binding
 - **Issue #4 Phase 4: Multi-instance tick and event grouping** ← CURRENT PRIORITY

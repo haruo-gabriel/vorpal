@@ -73,7 +73,7 @@ bool checkPath (const string &path) {
 bool DSPServer::started = false;
 std::unique_ptr<pd::PdReceiver> DSPServer::receiver = nullptr;
 std::vector<std::string> DSPServer::search_paths;
-std::deque<std::pair<PDInstance*, pd::Patch*>> DSPServer::to_be_closed__;
+std::deque<std::pair<int, pd::Patch*>> DSPServer::to_be_closed__;
 
 // UnitImpl implementation in dsp_detail namespace
 
@@ -90,7 +90,7 @@ class UnitImpl final : public DSPUnit {
  private:
   friend class vorpal::DSPServer;
   // No global command queue any more; commands route to UnitImpl::owner_->enqueue
-  static std::pair<PDInstance*, pd::Patch*> to_be_closed();
+  static std::pair<int, pd::Patch*> to_be_closed();
   Patch                           *patch_;
   PDInstance                      *owner_;
   vector<float>                   buffer_;
@@ -105,7 +105,9 @@ UnitImpl::UnitImpl(Patch *patch, PDInstance* owner)
 UnitImpl::~UnitImpl() {
   // Unregister from the owning instance's per-instance registry
   if (owner_) owner_->unregisterUnit(this);
-  DSPServer::to_be_closed__.emplace_back(owner_, patch_);
+  // Store instance_id instead of raw pointer to avoid dangling pointer issues
+  int instance_id = owner_ ? owner_->id() : -1;
+  DSPServer::to_be_closed__.emplace_back(instance_id, patch_);
 }
 
 void UnitImpl::transferSignal(shared_ptr<AudioUnit> audio_unit) {
@@ -128,9 +130,9 @@ void UnitImpl::pushCommand(const string &identifier,
 
 // popCommand removed: per-instance enqueue/handleCommands used instead
 
-std::pair<PDInstance*, pd::Patch*> UnitImpl::to_be_closed() {
+std::pair<int, pd::Patch*> UnitImpl::to_be_closed() {
   if (DSPServer::to_be_closed__.empty())
-    return {nullptr, nullptr};
+    return {-1, nullptr};
   auto pr = DSPServer::to_be_closed__.front();
   DSPServer::to_be_closed__.pop_front();
   return pr;
@@ -250,8 +252,10 @@ void DSPServer::cleanUp(InstanceManager& instance_manager) {
   while (true) {
     auto pr = dsp_detail::UnitImpl::to_be_closed();
     if (pr.second == nullptr) break;
-    PDInstance* owner = pr.first;
+    int instance_id = pr.first;
     Patch *patch = pr.second;
+    // Safe lookup: returns nullptr if instance was already destroyed
+    PDInstance* owner = instance_manager.get(instance_id);
     if (patch->isValid()) {
       if (owner) owner->pd().closePatch(*patch);
     }

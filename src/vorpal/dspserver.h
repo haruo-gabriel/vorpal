@@ -46,7 +46,7 @@ class DSPServer {
   static bool started;
   static std::unique_ptr<pd::PdReceiver> receiver;
   static std::vector<std::string> search_paths;
-  static std::deque<std::pair<PDInstance*, pd::Patch*>> to_be_closed__;
+  static std::deque<std::pair<int, pd::Patch*>> to_be_closed__;
 };
 
 } // namespace vorpal
