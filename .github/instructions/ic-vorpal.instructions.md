@@ -38,6 +38,11 @@ This document is the authoritative plan for implementing Pure Data (libpd) multi
 - 11. Risks and Mitigations
 - 12. Acceptance Criteria
 - 13. Future Work and References
+- 14. libpd Documentation and Code Reference
+- 15. Test Infrastructure and Automation
+- 16. Implementation Checklist (MVP)
+- 17. Current Architecture Status
+- 18. Implementation History (Completed Work)
 
 ---
 
@@ -586,7 +591,135 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
 
 ---
 
-## Implementation Checklist (MVP)
+## 15. Test Infrastructure and Automation
+
+### Test Organization
+
+All multi-instance tests are located in `src/tests/` with isolated directories per test:
+
+```
+src/tests/
+├── pd_multi_test/              # libpd multi-instance compilation verification
+├── pdinstance_test/            # PDInstance isolation (6 instances stress test)
+├── instancemanager_test/       # InstanceManager lifecycle management
+├── instancemanager_autoid_test/# Auto-ID generation validation
+├── engine_multiinstance_test/  # Engine API and dangling pointer fix
+└── command_routing_test/       # Command isolation (PRIMARY acceptance test)
+```
+
+Each test directory contains:
+- Test source file: `<testname>/<testname>.cpp`
+- Dedicated patches: `<testname>/patches/*.pd` (if needed)
+
+Build output location: `build/bin/` with patches copied to `build/bin/patches/<testname>/`
+
+### Running Tests
+
+**Quick Start (Recommended):**
+```bash
+make test           # Build and run all tests
+make test-verbose   # Show full test output
+make test-quick     # Run without rebuilding (fast iteration)
+```
+
+**Manual Execution:**
+```bash
+cd build/bin
+./pd_multi_test
+./pdinstance_test
+./instancemanager_test
+./instancemanager_autoid_test
+./engine_multiinstance_test
+./command_routing_test
+```
+
+**Advanced CTest Usage:**
+```bash
+cd build
+ctest                    # Run all tests
+ctest -j4                # Parallel execution (4 jobs)
+ctest -V                 # Verbose output
+ctest -R instance        # Run only tests matching "instance"
+ctest --rerun-failed     # Re-run only failed tests
+ctest --output-on-failure # Show output only for failures
+```
+
+### Test Automation
+
+**Build System Integration:**
+- CMake: `enable_testing()` in root CMakeLists.txt
+- CTest: 6 tests registered with 30-second timeouts
+- Make targets: Convenience wrapper for common workflows
+- Working directory: `${CMAKE_BINARY_DIR}/bin` for all tests
+
+**Parallel Execution:**
+- Tests run concurrently with `ctest -j4`
+- Total time limited by longest test (pdinstance_test ~3 seconds)
+- No shared state between tests (full isolation)
+
+**IDE Integration:**
+- VS Code Test Explorer (CMake Tools extension)
+- CLion (native CTest support)
+- Visual Studio (native support)
+
+### Test Coverage Matrix
+
+| Test | Purpose | Validates | Status |
+|------|---------|-----------|--------|
+| **pd_multi_test** | libpd PDINSTANCE compilation | WARP §5 Step 1 | ✅ PASS (0.00s) |
+| **pdinstance_test** | 6 isolated instances stress test | WARP §5 Step 2 | ✅ PASS (3.01s) |
+| **instancemanager_test** | Lifecycle management | WARP §5 Step 3 | ✅ PASS (0.00s) |
+| **instancemanager_autoid_test** | Auto-ID generation | Issue #3 API | ✅ PASS (0.00s) |
+| **engine_multiinstance_test** | Engine API & pointer safety | WARP §5 Step 4 | ✅ PASS (0.02s) |
+| **command_routing_test** | Command isolation (PRIMARY) | WARP §12 Acceptance | ✅ PASS (0.02s) |
+
+### Adding New Tests
+
+1. Create test directory: `src/tests/mytest/`
+2. Add test source: `src/tests/mytest/mytest.cpp`
+3. (Optional) Add patches: `src/tests/mytest/patches/*.pd`
+4. Update `src/tests/CMakeLists.txt`:
+   ```cmake
+   add_executable(mytest mytest/mytest.cpp)
+   target_link_libraries(mytest PRIVATE vorpal pdcpp)
+   target_include_directories(mytest PRIVATE ${CMAKE_SOURCE_DIR}/externals/include)
+   target_compile_features(mytest PRIVATE cxx_std_11)
+   set_target_properties(mytest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+   
+   # Register with CTest
+   add_test(NAME mytest COMMAND mytest WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+   set_tests_properties(mytest PROPERTIES TIMEOUT 30)
+   ```
+5. If using patches, add copy command to CMakeLists.txt:
+   ```cmake
+   add_custom_command(TARGET mytest POST_BUILD
+       COMMAND ${CMAKE_COMMAND} -E copy_directory
+       ${CMAKE_SOURCE_DIR}/src/tests/mytest/patches
+       ${CMAKE_BINARY_DIR}/bin/patches/mytest)
+   ```
+
+### Benefits of Current Organization
+
+1. **Isolation**: Each test has dedicated resources; no shared state
+2. **Maintainability**: Easy to add/remove tests independently
+3. **Performance**: Parallel execution reduces total test time
+4. **Zero Dependencies**: Uses CMake (CTest) and Make (already required)
+5. **Backward Compatible**: Manual execution still works from build/bin/
+6. **Self-Documenting**: Directory structure reflects test purpose
+
+### Test Documentation
+
+Detailed test documentation: `src/tests/README.md`
+- Test structure and organization
+- Build output details
+- Running tests (quick start, manual, advanced CTest)
+- IDE integration instructions
+- Adding new tests guide
+- WARP specification mapping
+
+---
+
+## 16. Implementation Checklist (MVP)
 - [ ] Tracking: VORPAL Multi-Instance Support (WARP MVP) — https://github.com/haruo-gabriel/vorpal/issues/7
 - [x] Step 1: Enable libpd multi-instances (PDINSTANCE/PDTHREADS) — https://github.com/haruo-gabriel/vorpal/issues/1 ✅ COMPLETE
 - [x] Step 2: Refactor DSPServer into per-instance PDInstance (no globals) — https://github.com/haruo-gabriel/vorpal/issues/2 ✅ COMPLETE
@@ -607,7 +740,7 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
   - ✅ Methods: `destroyInstance(id)`, `get(id)`, `ids()`, `defaultInstance()`, `findInstanceByPatchDollar()`
   - ✅ Graceful failure handling (returns -1 or false on creation failure)
   - ✅ Tests pass: instancemanager_test validates create/destroy/get/duplicate detection
-- [ ] Step 4: Engine changes for multi-instance tick and event grouping — https://github.com/haruo-gabriel/vorpal/issues/4
+- [x] Step 4: Engine changes for multi-instance tick and event grouping — https://github.com/haruo-gabriel/vorpal/issues/4 ✅ COMPLETE
   - [x] **Phase 1**: Update `DSPServer::loadUnit(path, instance_id=0)` to accept instance parameter ✅ COMPLETE
     - ✅ Updated signature with default parameter `instance_id=0`
     - ✅ Routes unit creation to `instance_manager.get(instance_id)`
@@ -638,6 +771,15 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
     - ✅ Per-instance event processing in tick loop
     - ✅ Added `totalEventCount()` helper function
     - ✅ Tests pass: instancemanager_test, pdinstance_test, engine_multiinstance_test
+    - ✅ Test automation: CTest integration with 6 tests, Makefile targets, parallel execution support
+    - ✅ **FIXED**: Dangling pointer issue resolved - `to_be_closed__` now uses instance_id instead of raw pointer
+  - [x] **Phase 4**: Multi-instance tick processing and event grouping ✅ COMPLETE
+    - ✅ Replaced `vector<weak_ptr<SoundtrackEvent>> events__` with `map<int, vector<...>> events_by_inst__`
+    - ✅ Updated `Engine::eventInstance()` to add events to instance-specific group
+    - ✅ Modified `Engine::tick()` to iterate all instances via `instances_` map
+    - ✅ Per-instance event processing in tick loop
+    - ✅ Added `totalEventCount()` helper function
+    - ✅ Tests pass: instancemanager_test, pdinstance_test, engine_multiinstance_test
 - [ ] Step 5: Godot GDExtension API surface for instances — https://github.com/haruo-gabriel/vorpal/issues/5
   - Expose `VORPALModule::create_instance()` in GDScript
   - Expose `VORPALModule::destroy_instance(instance_id)`
@@ -649,7 +791,7 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
   - Performance test: CPU scaling with instance count
   - Audio quality test: No dropouts with 2+ concurrent instances
 
-## Current Architecture Status (as of Issue #4 Phase 4 completion)
+## 17. Current Architecture Status (as of Issue #4 Phase 4 completion)
 
 ### ✅ Completed Components
 - **PDInstance**: Per-instance libpd wrapper with isolated state (patches, commands, units)
@@ -660,7 +802,7 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
 - **Multi-instance tick processing**: Engine processes all instances and their events per tick
 
 ### ✅ Architectural Alignment (WARP §7.3)
-**Current Reality (as of Phase 4 completion):**
+**Current Reality (as of Issue #4 Phase 4 completion):**
 - ✅ InstanceManager **owned by Engine** (as `Engine::instances_` private member)
 - ✅ Engine **exposes multi-instance API**: `createInstance()`, `destroyInstance()`, `instanceManager()`
 - ✅ `DSPServer::loadUnit(path, instance_manager, instance_id=0)` **accepts InstanceManager reference**
@@ -668,25 +810,27 @@ find /home/haruo/ic-vorpal/Vorpal-GDExtension/vorpal/externals/libpd/cpp -name "
 - ✅ DSPServer is now a utility layer (no static InstanceManager)
 - ✅ `Engine::tick()` processes all instances via InstanceManager with per-instance event grouping
 - ✅ Events grouped by instance_id in `map<int, vector<weak_ptr<SoundtrackEvent>>> events_by_inst__`
+- ✅ Test automation infrastructure complete with CTest integration and 6 passing tests
 
 **Architecture Achievement:**
 - Matches WARP specification §7.3: Engine owns InstanceManager
 - Multi-instance API surface complete at C++ level
 - Backward compatibility maintained with default instance_id=0
 - Per-instance tick processing and event grouping implemented
+- **Issue #4 COMPLETE**: All 4 phases finished and tested
 
-### 🔄 In Progress / Next Steps (Issue #4)
-- ✅ **Phase 1 COMPLETE**: DSPServer::loadUnit and Engine::eventInstance accept instance_id parameter
-- ✅ **Phase 2 COMPLETE**: Move InstanceManager ownership from DSPServer to Engine (WARP alignment achieved)
-- ✅ **Phase 3 COMPLETE**: Engine exposes multi-instance API (createInstance/destroyInstance)
-- ✅ **Phase 4 COMPLETE**: Multi-instance tick processing and event grouping in Engine
-- **Next (Issue #5)**: Godot GDExtension bindings for multi-instance API ← CURRENT PRIORITY
+### 🎯 Next Priority: Issue #5 - Godot GDExtension API
 
-### 📋 Remaining Work
-Loading video...
+**Current Status:** C++ multi-instance API complete; ready for GDScript bindings
 
+**Required Work:**
+- Expose `VORPALModule::create_instance()` in GDScript
+- Expose `VORPALModule::destroy_instance(instance_id)`
+- Update `VORPALModule::event_instance(name, instance_id=0)` with default parameter
+- Update GDExtension bindings (_bind_methods)
+- Create GDScript demo showing multi-instance usage
 
-#### Immediate Next Steps (Priority Order) - Issue #4
+### 📋 Implementation Summary - Issue #4 (COMPLETE)
 
 **Phase 1: DSPServer::loadUnit API Update** ✅ COMPLETE
 1. ✅ Changed signature: `shared_ptr<DSPUnit> loadUnit(const string& path, int instance_id=0)`
@@ -723,34 +867,51 @@ Loading video...
 - GDScript bindings
 - Example usage in demo project
 
-## Next improvements:
-- ✅ ~~Convert UnitImpl::units__ into a per-instance registry~~ **DONE** (completed as part of Issue #2)
-- ✅ ~~Add auto-ID overload: `InstanceManager::createInstance(paths)` returns int~~ **DONE** (completed in Issue #3)
-- ✅ ~~Issue #4 Phase 1: Update loadUnit to accept instance_id argument~~ **DONE**
-  - ✅ Modified `DSPServer::loadUnit(path, instance_id=0)` signature
-  - ✅ Routes unit creation to specified instance via `instance_manager.get(instance_id)`
-  - ✅ Updated `Engine::eventInstance(path, out, instance_id=0)` signature and implementation
-  - ✅ Backward compatibility maintained with default parameters
-  - ✅ Tests: instancemanager_test, pdinstance_test, engine_multiinstance_test all pass
-- ✅ ~~Issue #4 Phase 2: Move InstanceManager from DSPServer to Engine~~ **DONE**
-  - ✅ Engine owns `InstanceManager instances_` (per WARP §7.3)
-  - ✅ DSPServer methods accept InstanceManager& reference
-  - ✅ Architectural alignment with WARP specification achieved
-- ✅ ~~Issue #4 Phase 3: Engine multi-instance API~~ **DONE**
-  - ✅ `Engine::createInstance()` / `Engine::destroyInstance()` implemented
-  - ✅ Tests validate multi-instance event creation and binding
-  - ✅ **Dangling pointer fix**: Changed `to_be_closed__` from `pair<PDInstance*, Patch*>` to `pair<int, Patch*>`
-    - UnitImpl destructor now stores instance_id instead of raw pointer
-    - cleanUp() safely looks up instance via InstanceManager::get(id)
-    - Returns nullptr if instance was destroyed - no crash
-    - Test validates: destroy instance with active units → safe cleanup
-- ✅ ~~Issue #4 Phase 4: Multi-instance tick and event grouping~~ **DONE**
-  - ✅ `Engine::instanceManager()` accessor added
-  - ✅ Tests validate multi-instance event creation and binding
-- **Issue #4 Phase 4: Multi-instance tick and event grouping** ← CURRENT PRIORITY
-  - Update `Engine::tick()` to process all instances
-  - Group events by instance_id for efficient per-instance streaming
-- **Issue #5: Expose multi-instance API to Godot GDExtension (VORPALModule)**
-  - Bind createInstance/destroyInstance/eventInstance to GDScript
-  - Update VORPALModule wrapper
-  - Create GDScript demo showing multi-instance usage
+---
+
+## 18. Implementation History (Completed Work)
+
+### Issue #2: PDInstance Per-Instance State ✅ COMPLETE
+- ✅ Replaced global `pd::PdBase dsp` with per-instance `PDInstance::pd_`
+- ✅ Moved command queues into PDInstance scope
+- ✅ Converted `UnitImpl::units__` into a per-instance registry
+- ✅ Per-instance unit registry for true isolation
+
+### Issue #3: InstanceManager ✅ COMPLETE
+- ✅ Auto-ID generation API: `InstanceManager::createInstance(paths)` returns int
+- ✅ Manual ID API: `createInstance(id, paths)` for internal use
+- ✅ Methods: `destroyInstance(id)`, `get(id)`, `ids()`, `defaultInstance()`
+
+### Issue #4: Engine Multi-Instance Integration ✅ COMPLETE
+
+**Phase 1: DSPServer::loadUnit API Update**
+- ✅ Modified `DSPServer::loadUnit(path, instance_id=0)` signature
+- ✅ Routes unit creation to specified instance via `instance_manager.get(instance_id)`
+- ✅ Updated `Engine::eventInstance(path, out, instance_id=0)` signature and implementation
+- ✅ Backward compatibility maintained with default parameters
+
+**Phase 2: Move InstanceManager from DSPServer to Engine**
+- ✅ Engine owns `InstanceManager instances_` (per WARP §7.3)
+- ✅ DSPServer methods accept InstanceManager& reference
+- ✅ Architectural alignment with WARP specification achieved
+
+**Phase 3: Engine Multi-Instance API**
+- ✅ `Engine::createInstance()` / `Engine::destroyInstance()` implemented
+- ✅ **Dangling pointer fix**: Changed `to_be_closed__` from `pair<PDInstance*, Patch*>` to `pair<int, Patch*>`
+  - UnitImpl destructor now stores instance_id instead of raw pointer
+  - cleanUp() safely looks up instance via InstanceManager::get(id)
+  - Returns nullptr if instance was destroyed - no crash
+  - Test validates: destroy instance with active units → safe cleanup
+
+**Phase 4: Multi-Instance Tick Processing and Event Grouping**
+- ✅ Replaced `vector<weak_ptr<SoundtrackEvent>> events__` with `map<int, vector<...>> events_by_inst__`
+- ✅ Updated `Engine::eventInstance()` to add events to instance-specific group
+- ✅ Modified `Engine::tick()` to iterate all instances via `instances_` map
+- ✅ Per-instance event processing in tick loop
+- ✅ Added `totalEventCount()` helper function
+- ✅ Test automation: CTest integration with 6 tests, Makefile targets, parallel execution support
+
+### Issue #5: Godot GDExtension API (Next Priority)
+- [ ] Bind createInstance/destroyInstance/eventInstance to GDScript
+- [ ] Update VORPALModule wrapper
+- [ ] Create GDScript demo showing multi-instance usage
