@@ -30,6 +30,9 @@ link_directories (${CMAKE_BINARY_DIR}/externals/lib)
 
 set (PROJECT_EXPORT "${PROJECT_NAME}")
 
+# Enable CTest for automated testing
+enable_testing()
+
 add_subdirectory (src)
 add_subdirectory (externals)
 

@@ -134,3 +134,45 @@ add_custom_command(TARGET command_routing_test POST_BUILD
     ${CMAKE_BINARY_DIR}/bin/patches/command_routing_test
   COMMENT "Copying command_routing_test patches"
 )
+
+# ==============================================================================
+# CTest Integration - Automated Test Execution
+# ==============================================================================
+
+enable_testing()
+
+# Register all multi-instance tests with CTest
+add_test(NAME pd_multi_test 
+         COMMAND pd_multi_test 
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+add_test(NAME pdinstance_test 
+         COMMAND pdinstance_test 
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+add_test(NAME instancemanager_test 
+         COMMAND instancemanager_test 
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+add_test(NAME instancemanager_autoid_test 
+         COMMAND instancemanager_autoid_test 
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+add_test(NAME engine_multiinstance_test 
+         COMMAND engine_multiinstance_test 
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+add_test(NAME command_routing_test 
+         COMMAND command_routing_test 
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# Set test timeouts (30 seconds per test)
+set_tests_properties(
+  pd_multi_test
+  pdinstance_test
+  instancemanager_test
+  instancemanager_autoid_test
+  engine_multiinstance_test
+  command_routing_test
+  PROPERTIES TIMEOUT 30
+)

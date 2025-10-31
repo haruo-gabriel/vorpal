@@ -52,23 +52,54 @@ build/bin/
 
 ## Running Tests
 
-From the `build/bin` directory:
+### Quick Start (Recommended)
+
+From project root:
+
+```bash
+make test           # Build and run all tests
+make test-verbose   # Show full test output
+make test-quick     # Run without rebuilding (fast iteration)
+```
+
+### Manual Execution
+
+From `build/bin` directory:
 
 ```bash
 cd build/bin
 
-# Run all tests
+# Run individual tests
 ./pd_multi_test
 ./pdinstance_test
 ./instancemanager_test
 ./instancemanager_autoid_test
 ./engine_multiinstance_test
 ./command_routing_test
-
-# Or run from build directory
-cd build
-make && cd bin && for test in *_test; do ./$test || break; done
 ```
+
+### Advanced CTest Usage
+
+From `build` directory:
+
+```bash
+cd build
+
+ctest                    # Run all tests
+ctest -j4                # Parallel execution (4 jobs)
+ctest -V                 # Verbose output
+ctest -R instance        # Run only tests matching "instance"
+ctest --rerun-failed     # Re-run only failed tests
+ctest --output-on-failure # Show output only for failed tests
+```
+
+### IDE Integration
+
+CTest is automatically detected by:
+- VS Code Test Explorer (with CMake Tools extension)
+- CLion (native support)
+- Visual Studio (native support)
+
 
 ## Test Coverage
 
