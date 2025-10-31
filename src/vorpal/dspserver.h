@@ -28,7 +28,7 @@ namespace dsp_detail {
 class DSPServer {
  public:
   Status start(const std::vector<std::string>& patch_paths);
-  std::shared_ptr<DSPUnit> loadUnit(const std::string &path);
+  std::shared_ptr<DSPUnit> loadUnit(const std::string &path, int instance_id = 0);
   size_t sample_rate() const;
   int tick_size() const;
   double time_per_tick() const;

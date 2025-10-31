@@ -158,12 +158,12 @@ Status DSPServer::start(const vector<string>& patch_paths) {
   return Status::FAILURE("DSP Server could not start");
 }
 
-shared_ptr<DSPUnit> DSPServer::loadUnit(const string &path) {
+shared_ptr<DSPUnit> DSPServer::loadUnit(const string &path, int instance_id) {
   string filename = path + ".pd";
   for (string search_path : search_paths) {
     if (checkPath(search_path+"/"+filename)) {
-      // open with the default instance
-      PDInstance* inst = instance_manager.get(0);
+      // open with the specified instance (default 0 for backward compatibility)
+      PDInstance* inst = instance_manager.get(instance_id);
       if (!inst) continue;
       Patch check = inst->pd().openPatch(filename, search_path);
       if (check.isValid()) {
