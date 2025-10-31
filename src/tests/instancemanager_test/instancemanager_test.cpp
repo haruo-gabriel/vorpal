@@ -11,7 +11,7 @@ int main() {
   InstanceManager mgr;
 
   // Create instance 0 and ensure it starts
-  bool ok = mgr.createInstance(0, {"../patches"}, 44100);
+  bool ok = mgr.createInstance(0, {"patches/instancemanager_test"}, 44100);
   if (!ok) {
     std::cerr << "Failed to create default instance 0" << std::endl;
     return 2;
@@ -35,7 +35,7 @@ int main() {
   inst0->closePatch(dz);
 
   // Negative test: creating the same instance id again should fail
-  bool duplicate = mgr.createInstance(0, {"../patches"}, 44100);
+  bool duplicate = mgr.createInstance(0, {"patches/instancemanager_test"}, 44100);
   if (duplicate) {
     std::cerr << "NEGATIVE TEST FAILED: duplicate instance creation returned true" << std::endl;
     mgr.destroyInstance(0);
@@ -45,7 +45,7 @@ int main() {
   }
 
   // Negative test: load a missing patch on a new instance
-  bool ok2 = mgr.createInstance(5, {"../patches"}, 44100);
+  bool ok2 = mgr.createInstance(5, {"patches/instancemanager_test"}, 44100);
   if (!ok2) {
     std::cerr << "Warning: could not create instance 5 for missing-patch test" << std::endl;
   } else {

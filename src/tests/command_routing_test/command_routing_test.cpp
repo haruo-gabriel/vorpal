@@ -29,7 +29,7 @@ int main() {
   std::cout << "Goal: Verify commands route to correct instance with no cross-talk" << std::endl;
   
   // Setup: Create test patches vector
-  std::vector<std::string> paths = {"../patches"};
+  std::vector<std::string> paths = {"patches/command_routing_test"};
   
   // Start engine (creates default instance 0)
   Engine engine;

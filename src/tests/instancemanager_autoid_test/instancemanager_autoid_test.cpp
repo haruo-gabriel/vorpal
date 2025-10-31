@@ -11,7 +11,7 @@ int main() {
   InstanceManager mgr;
 
   // Test auto-ID generation
-  int id1 = mgr.createInstance({"../patches"}, 44100);
+  int id1 = mgr.createInstance({"patches/instancemanager_autoid_test"}, 44100);
   if (id1 < 0) {
     std::cerr << "Failed to create instance with auto-ID" << std::endl;
     return 1;
@@ -35,7 +35,7 @@ int main() {
   std::cout << "Instance " << id1 << " opened patch dz=" << dz1 << std::endl;
 
   // Create another instance - should get next ID
-  int id2 = mgr.createInstance({"../patches"}, 44100);
+  int id2 = mgr.createInstance({"patches/instancemanager_autoid_test"}, 44100);
   if (id2 < 0) {
     std::cerr << "Failed to create second instance with auto-ID" << std::endl;
     mgr.destroyInstance(id1);
@@ -71,7 +71,7 @@ int main() {
   std::cout << "Instance " << id2 << " opened patch dz=" << dz2 << std::endl;
 
   // Test that manual ID creation still works alongside auto-ID
-  bool manual_ok = mgr.createInstance(100, {"../patches"}, 44100);
+  bool manual_ok = mgr.createInstance(100, {"patches/instancemanager_autoid_test"}, 44100);
   if (!manual_ok) {
     std::cerr << "Manual ID creation (100) failed" << std::endl;
     mgr.destroyInstance(id1);

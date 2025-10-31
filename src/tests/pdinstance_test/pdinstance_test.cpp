@@ -25,7 +25,7 @@ int main() {
 
   for (int i = 0; i < NUM_INSTANCES; ++i) {
     instances.emplace_back(new PDInstance(100 + i));
-    bool started = instances.back()->start({"../patches"}, 44100, true, 1, 2);
+    bool started = instances.back()->start({"patches/pdinstance_test"}, 44100, true, 1, 2);
     if (!started) {
       std::cerr << "Failed to start instance " << (100 + i) << std::endl;
       return 3;

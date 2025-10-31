@@ -1,0 +1,5 @@
+#N canvas 100 100 300 220 10;
+#X obj 20 20 sig~ 0.25;
+#X obj 20 80 tabwrite~ vorpal-bus-A;
+#X obj 100 140 table vorpal-bus-A 64;
+#X connect 0 0 1 0;
