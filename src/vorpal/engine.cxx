@@ -189,6 +189,10 @@ int Engine::createInstance(const std::vector<std::string>& paths) {
 }
 
 void Engine::destroyInstance(int instance_id) {
+  // Remove all events associated with this instance to prevent use-after-free
+  events_by_inst__.erase(instance_id);
+  
+  // Now safe to destroy the PDInstance
   instances_.destroyInstance(instance_id);
 }
 

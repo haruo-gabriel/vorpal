@@ -24,6 +24,9 @@ bool PDInstance::start(const std::vector<std::string>& search_paths, int sample_
 }
 
 void PDInstance::finish() {
+  // Clear unit registry first to prevent use-after-free during destruction
+  units_.clear();
+  
   // Close patches
   for (auto& kv : patches_) {
     pd_.closePatch(kv.second);

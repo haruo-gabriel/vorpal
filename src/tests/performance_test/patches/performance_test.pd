@@ -1,0 +1,17 @@
+#N canvas 0 0 450 300 12;
+#X obj 100 50 loadbang;
+#X obj 100 100 f \$0;
+#X obj 100 150 pack f s;
+#X msg 100 200 \; test-result-\$2 \$1;
+#X connect 0 0 1 0;
+#X connect 1 0 2 0;
+#X connect 2 0 3 0;
+#X obj 200 50 inlet;
+#X text 200 30 command inlet;
+#X obj 200 100 route set-value;
+#X obj 200 150 f;
+#X connect 7 0 9 0;
+#X connect 9 0 10 0;
+#X connect 10 0 2 0;
+#X text 50 250 Simple test patch for performance testing;
+#X text 50 270 Stores values in test-result-\$0 array;

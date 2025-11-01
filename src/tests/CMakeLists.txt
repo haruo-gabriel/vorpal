@@ -90,6 +90,36 @@ if(DEFINED ENABLE_LIBPD_MULTI AND ENABLE_LIBPD_MULTI)
   target_compile_definitions(command_routing_test PRIVATE PDINSTANCE=1 PDTHREADS=1)
 endif()
 
+# Test 7: Performance benchmarking (tick timing, CPU scaling, hitching)
+add_executable(performance_test 
+  performance_test/performance_test.cpp
+)
+target_include_directories(performance_test PRIVATE
+  ${CMAKE_BINARY_DIR}/externals/include/libpd
+  ${CMAKE_BINARY_DIR}/externals/include/libpd/util
+  ${CMAKE_SOURCE_DIR}/src/vorpal
+)
+target_link_libraries(performance_test PRIVATE pdcpp vorpal ${OPENAL_LIBRARY})
+target_compile_features(performance_test PRIVATE cxx_std_11)
+if(DEFINED ENABLE_LIBPD_MULTI AND ENABLE_LIBPD_MULTI)
+  target_compile_definitions(performance_test PRIVATE PDINSTANCE=1 PDTHREADS=1)
+endif()
+
+# Test 8: Burst stress testing (rapid operations, concurrent load)
+add_executable(burst_stress_test 
+  burst_stress_test/burst_stress_test.cpp
+)
+target_include_directories(burst_stress_test PRIVATE
+  ${CMAKE_BINARY_DIR}/externals/include/libpd
+  ${CMAKE_BINARY_DIR}/externals/include/libpd/util
+  ${CMAKE_SOURCE_DIR}/src/vorpal
+)
+target_link_libraries(burst_stress_test PRIVATE pdcpp vorpal ${OPENAL_LIBRARY})
+target_compile_features(burst_stress_test PRIVATE cxx_std_11)
+if(DEFINED ENABLE_LIBPD_MULTI AND ENABLE_LIBPD_MULTI)
+  target_compile_definitions(burst_stress_test PRIVATE PDINSTANCE=1 PDTHREADS=1)
+endif()
+
 # Set output directory for all test executables to bin/
 set_target_properties(
   pd_multi_test
@@ -98,6 +128,8 @@ set_target_properties(
   instancemanager_autoid_test
   engine_multiinstance_test
   command_routing_test
+  performance_test
+  burst_stress_test
   PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
@@ -135,6 +167,22 @@ add_custom_command(TARGET command_routing_test POST_BUILD
   COMMENT "Copying command_routing_test patches"
 )
 
+add_custom_command(TARGET performance_test POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin/patches/performance_test
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_CURRENT_SOURCE_DIR}/performance_test/patches
+    ${CMAKE_BINARY_DIR}/bin/patches/performance_test
+  COMMENT "Copying performance_test patches"
+)
+
+add_custom_command(TARGET burst_stress_test POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin/patches/burst_test
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_CURRENT_SOURCE_DIR}/burst_stress_test/patches
+    ${CMAKE_BINARY_DIR}/bin/patches/burst_test
+  COMMENT "Copying burst_stress_test patches"
+)
+
 # ==============================================================================
 # CTest Integration - Automated Test Execution
 # ==============================================================================
@@ -166,7 +214,15 @@ add_test(NAME command_routing_test
          COMMAND command_routing_test 
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# Set test timeouts (30 seconds per test)
+add_test(NAME performance_test 
+         COMMAND performance_test 
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+add_test(NAME burst_stress_test 
+         COMMAND burst_stress_test 
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# Set test timeouts (30 seconds for most, 60 seconds for stress tests)
 set_tests_properties(
   pd_multi_test
   pdinstance_test
@@ -175,4 +231,10 @@ set_tests_properties(
   engine_multiinstance_test
   command_routing_test
   PROPERTIES TIMEOUT 30
+)
+
+set_tests_properties(
+  performance_test
+  burst_stress_test
+  PROPERTIES TIMEOUT 60
 )
