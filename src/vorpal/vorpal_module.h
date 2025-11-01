@@ -30,7 +30,14 @@ using std::vector;
             bool start(const String &path);
             void finish();
             bool ok() const;
-            int eventInstance(const String &name);
+            
+            // Multi-instance management
+            int createInstance();
+            void destroyInstance(int instance_id);
+            
+            // Event creation bound to specific instance (default 0 for backward compatibility)
+            int eventInstance(const String &name, int instance_id = 0);
+            
             void freeEvent(int id);
             void clear();
             void pushCommand(int id, const String &cmd);

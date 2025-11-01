@@ -15,14 +15,22 @@ namespace godot {
 
     bool VORPALModule::ok() const { return engine_.started(); }
 
-    int VORPALModule::eventInstance(const String &name) {
+    int VORPALModule::createInstance() {
+        return engine_.createInstance();
+    }
+
+    void VORPALModule::destroyInstance(int instance_id) {
+        engine_.destroyInstance(instance_id);
+    }
+
+    int VORPALModule::eventInstance(const String &name, int instance_id) {
         shared_ptr<vorpal::SoundtrackEvent> event;
-        vorpal::Status status = engine_.eventInstance(name.ascii().get_data(), &event);
+        vorpal::Status status = engine_.eventInstance(name.ascii().get_data(), &event, instance_id);
         if (status.ok()) {
             events_.push_back(event);
             return events_.size()-1;
         }
-        std::cout << "[VORPAL-wrap] Failed to instanciate event '"
+        std::cout << "[VORPAL-wrap] Failed to instantiate event '"
                   << name.ascii().get_data() << "'" << std::endl;
         std::cout << "[VORPAL-wrap] " << status.description() << std::endl;
         return -1;
@@ -57,7 +65,16 @@ namespace godot {
       ClassDB::bind_method(D_METHOD("ok"), &VORPALModule::ok);
       ClassDB::bind_method(D_METHOD("start"), &VORPALModule::start);
       ClassDB::bind_method(D_METHOD("finish"), &VORPALModule::finish);
-      ClassDB::bind_method(D_METHOD("event_instance"), &VORPALModule::eventInstance);
+      
+      // Multi-instance management
+      ClassDB::bind_method(D_METHOD("create_instance"), &VORPALModule::createInstance);
+      ClassDB::bind_method(D_METHOD("destroy_instance", "instance_id"), &VORPALModule::destroyInstance);
+      
+      // Event creation with instance_id parameter (default 0 for backward compatibility)
+      ClassDB::bind_method(D_METHOD("event_instance", "name", "instance_id"), 
+                           &VORPALModule::eventInstance, 
+                           DEFVAL(0));
+      
       ClassDB::bind_method(D_METHOD("free_event"), &VORPALModule::freeEvent);
       ClassDB::bind_method(D_METHOD("clear"), &VORPALModule::clear);
       ClassDB::bind_method(D_METHOD("set_event_position"),
