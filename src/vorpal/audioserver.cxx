@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <cmath>
 
 namespace vorpal {
 
@@ -62,8 +63,30 @@ AudioServer::AudioServer()
   for (unsigned i = 0; i < NUM_BUFFERS; ++i)
     free_buffers_.push(buffers_[i]);
   alGenSources(NUM_SOURCES, sources_.data());
-  for (size_t i = 0; i < sources_.size(); ++i)
+  
+  // Configure all sources with default parameters
+  for (size_t i = 0; i < sources_.size(); ++i) {
+    alSourcef(sources_[i], AL_GAIN, 1.0f);
+    alSourcef(sources_[i], AL_PITCH, 1.0f);
+    alSource3f(sources_[i], AL_POSITION, 0.0f, 0.0f, 0.0f);
+    alSource3f(sources_[i], AL_VELOCITY, 0.0f, 0.0f, 0.0f);
+    alSourcei(sources_[i], AL_LOOPING, AL_FALSE);
+    alSourcei(sources_[i], AL_SOURCE_RELATIVE, AL_FALSE);
     free_sources_.push(i);
+  }
+  
+  // Set up listener at origin facing forward
+  ALfloat listenerPos[] = {0.0f, 0.0f, 0.0f};
+  ALfloat listenerVel[] = {0.0f, 0.0f, 0.0f};
+  ALfloat listenerOri[] = {0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f};
+  alListenerfv(AL_POSITION, listenerPos);
+  alListenerfv(AL_VELOCITY, listenerVel);
+  alListenerfv(AL_ORIENTATION, listenerOri);
+  std::cout << "[VORPAL AudioServer] OpenAL listener initialized" << std::endl;
+  ALenum error = alGetError();
+  if (error != AL_NO_ERROR) {
+    std::cerr << "[VORPAL AudioServer] OpenAL initialization error: " << error << std::endl;
+  }
 }
 
 // Destructor
@@ -117,13 +140,32 @@ size_t AudioServer::availableBuffers() const {
 
 void AudioServer::streamData(size_t source_id, const vector<int16_t> &samples) {
   if (free_buffers_.size() > 0) {
+    // Check if samples contain actual audio data
+    static int log_counter = 0;
+    if (log_counter++ < 5) { // Log first 5 times
+      float rms = 0.0f;
+      for (int16_t sample : samples) {
+        float s = sample / 32767.0f;
+        rms += s * s;
+      }
+      rms = sqrt(rms / samples.size());
+      std::cout << "[VORPAL AudioServer] streamData source=" << source_id 
+                << " samples=" << samples.size() << " RMS=" << rms << std::endl;
+    }
+    
     ALuint buffer = free_buffers_.front();
     ALuint source = sources_[source_id];
     free_buffers_.pop();
     fillBuffer(buffer, samples.data(), samples.size()*sizeof(int16_t));
     alSourceQueueBuffers(source, 1, &buffer);
-    if (!isSourcePlaying(source))
+    if (!isSourcePlaying(source)) {
+      std::cout << "[VORPAL AudioServer] Starting playback for source " << source_id << std::endl;
       alSourcePlay(source);
+      ALenum error = alGetError();
+      if (error != AL_NO_ERROR) {
+        std::cerr << "[VORPAL AudioServer] OpenAL error: " << error << std::endl;
+      }
+    }
   }
 }
 

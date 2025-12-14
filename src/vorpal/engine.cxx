@@ -73,6 +73,11 @@ Status Engine::start(const vector<string>& patch_paths) {
   device = alcOpenDevice(nullptr);
   if (!device)
     return Status::FAILURE("Could not open a device");
+  
+  // Log which device was opened
+  const ALCchar* deviceName = alcGetString(device, ALC_DEVICE_SPECIFIER);
+  std::cout << "[VORPAL Engine] OpenAL device: " << (deviceName ? deviceName : "unknown") << std::endl;
+  
   // Create and set context
   context = alcCreateContext(device, nullptr);
   if (!context || alcMakeContextCurrent(context) == ALC_FALSE) {
@@ -133,6 +138,13 @@ void Engine::finish() {
 }
 
 void Engine::tick(double dt) {
+  static int engine_tick_count = 0;
+  if (engine_tick_count++ < 5) {
+    std::cout << "[VORPAL Engine] tick() called dt=" << dt << " lag=" << lag__ << std::endl;
+    std::cout << "[VORPAL Engine] started()=" << started() 
+              << " events=" << totalEventCount() << std::endl;
+  }
+  
   DSPServer dsp;
   const double TICK = 1.0*TICK_BUFFER_SIZE/dsp.sample_rate();
   lag__ += dt;
@@ -141,6 +153,13 @@ void Engine::tick(double dt) {
   dsp.cleanUp(instances_);
   dsp.handleCommands(instances_);
   out << "[VORPAL] update by " << dt << " seconds" << std::endl;
+  
+  if (engine_tick_count <= 5) {
+    std::cout << "[VORPAL Engine] Before tick loop: lag=" << lag__ << " TICK=" << TICK 
+              << " availableBuffers=" << audioserver->availableBuffers() 
+              << " totalEventCount=" << totalEventCount() << std::endl;
+  }
+  
   while (lag__ >= TICK && audioserver->availableBuffers() >= totalEventCount()) {
     out << "[VORPAL] tick " << tick_counter__ << "("
         << audioserver->availableBuffers() << " available buffers)"
@@ -165,6 +184,12 @@ void Engine::tick(double dt) {
     }
     lag__ -= TICK;
     ++tick_counter__;
+    
+    // Start OpenAL playback after first tick
+    if (!playing_started && tick_counter__ > 0) {
+      audioserver->playSource(0);
+      playing_started = true;
+    }
   }
 }
 

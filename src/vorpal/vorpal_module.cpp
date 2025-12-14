@@ -1,6 +1,7 @@
 #include "vorpal_module.h"
 
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 
 namespace godot {
@@ -37,6 +38,14 @@ namespace godot {
     }
 
     void VORPALModule::freeEvent(int id) {
+        if (id < 0 || id >= static_cast<int>(events_.size())) {
+            std::cerr << "[VORPAL-wrap] Cannot free invalid event ID: " << id << std::endl;
+            return;
+        }
+        if (!events_[id]) {
+            std::cerr << "[VORPAL-wrap] Event " << id << " already freed" << std::endl;
+            return;
+        }
         events_[id].reset();
     }
 
@@ -45,18 +54,46 @@ namespace godot {
     }
 
     void VORPALModule::pushCommand (int id, const String &cmd) {
+      if (id < 0 || id >= static_cast<int>(events_.size())) {
+        std::cerr << "[VORPAL-wrap] Invalid event ID: " << id << std::endl;
+        return;
+      }
+      if (!events_[id]) {
+        std::cerr << "[VORPAL-wrap] Attempt to use freed event: " << id << std::endl;
+        return;
+      }
       events_[id]->pushCommand(cmd.ascii().get_data());
     }
 
     void VORPALModule::pushCommand1f (int id, const String &cmd, float arg) {
+      if (id < 0 || id >= static_cast<int>(events_.size())) {
+        std::cerr << "[VORPAL-wrap] Invalid event ID: " << id << std::endl;
+        return;
+      }
+      if (!events_[id]) {
+        std::cerr << "[VORPAL-wrap] Attempt to use freed event: " << id << std::endl;
+        return;
+      }
       events_[id]->pushCommand(cmd.ascii().get_data(), arg);
     }
 
     void VORPALModule::setEventPosition (int id, float x, float y, float z) {
+      if (id < 0 || id >= static_cast<int>(events_.size())) {
+        std::cerr << "[VORPAL-wrap] Invalid event ID: " << id << std::endl;
+        return;
+      }
+      if (!events_[id]) {
+        std::cerr << "[VORPAL-wrap] Attempt to use freed event: " << id << std::endl;
+        return;
+      }
       events_[id]->setAudioSource(x, y, z);
     }
 
     void VORPALModule::tick (double dt) {
+      static int tick_count = 0;
+      if (tick_count++ < 5) {
+        UtilityFunctions::print("[VORPAL-wrap] tick() called dt=", dt);
+      }
       engine_.tick(dt);
     }
 
