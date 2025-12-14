@@ -27,7 +27,28 @@ bool isSourcePlaying(int source) {
 
 class AudioServer::UnitImpl final : public AudioUnit {
  public:
-  ~UnitImpl() { server_->freeUnit(this); }
+  ~UnitImpl() { 
+    std::cout << "[VORPAL AudioServer] === UnitImpl destructor START ===" << std::endl;
+    std::cout << "[VORPAL AudioServer] Destroying AudioUnit for source index " << unit_id_ << std::endl;
+    
+    // Check OpenAL source state before freeing
+    ALint state;
+    alGetSourcei(server_->sources_[unit_id_], AL_SOURCE_STATE, &state);
+    std::cout << "[VORPAL AudioServer] OpenAL source " << server_->sources_[unit_id_] 
+              << " state: " << state;
+    if (state == AL_PLAYING) std::cout << " (AL_PLAYING)";
+    else if (state == AL_PAUSED) std::cout << " (AL_PAUSED)";
+    else if (state == AL_STOPPED) std::cout << " (AL_STOPPED)";
+    else if (state == AL_INITIAL) std::cout << " (AL_INITIAL)";
+    std::cout << std::endl;
+    
+    ALint queued;
+    alGetSourcei(server_->sources_[unit_id_], AL_BUFFERS_QUEUED, &queued);
+    std::cout << "[VORPAL AudioServer] Buffers queued: " << queued << std::endl;
+    
+    server_->freeUnit(this);
+    std::cout << "[VORPAL AudioServer] === UnitImpl destructor END ===" << std::endl;
+  }
   Status status() const override { return Status::OK("Valid audio unit"); }
   void setPosition(float x, float y, float z) override;
   void stream(const vector<float> &signal) override;
@@ -107,7 +128,10 @@ shared_ptr<AudioUnit> AudioServer::loadUnit() {
 }
 
 void AudioServer::freeUnit(const UnitImpl *unit) {
+  std::cout << "[VORPAL AudioServer] freeUnit() - returning source index " << unit->unit_id_ 
+            << " (OpenAL source " << sources_[unit->unit_id_] << ") to free pool" << std::endl;
   free_sources_.push(unit->unit_id_);
+  std::cout << "[VORPAL AudioServer] free_sources_.size() now = " << free_sources_.size() << std::endl;
 }
 
 // Set Source parameters

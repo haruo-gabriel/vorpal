@@ -38,15 +38,27 @@ namespace godot {
     }
 
     void VORPALModule::freeEvent(int id) {
+        std::cout << "[VORPAL-wrap] === freeEvent() START ===" << std::endl;
+        std::cout << "[VORPAL-wrap] Requested to free event ID: " << id << std::endl;
+        std::cout << "[VORPAL-wrap] events_.size() = " << events_.size() << std::endl;
+        
         if (id < 0 || id >= static_cast<int>(events_.size())) {
             std::cerr << "[VORPAL-wrap] Cannot free invalid event ID: " << id << std::endl;
+            std::cout << "[VORPAL-wrap] === freeEvent() END (invalid ID) ===" << std::endl;
             return;
         }
+        
         if (!events_[id]) {
             std::cerr << "[VORPAL-wrap] Event " << id << " already freed" << std::endl;
+            std::cout << "[VORPAL-wrap] === freeEvent() END (already freed) ===" << std::endl;
             return;
         }
+        
+        std::cout << "[VORPAL-wrap] Event " << id << " is valid, use_count = " << events_[id].use_count() << std::endl;
+        std::cout << "[VORPAL-wrap] Calling events_[" << id << "].reset()..." << std::endl;
         events_[id].reset();
+        std::cout << "[VORPAL-wrap] reset() completed" << std::endl;
+        std::cout << "[VORPAL-wrap] === freeEvent() END ===" << std::endl;
     }
 
     void VORPALModule::clear() {
